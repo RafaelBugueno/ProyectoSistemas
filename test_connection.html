@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API Connection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test de Conexión API</h1>
+    
+    <div>
+        <button onclick="testHealth()">Test Health</button>
+        <button onclick="testConsultorios()">Test Consultorios</button>
+        <button onclick="testAtenciones()">Test Atenciones</button>
+        <button onclick="testLogin()">Test Login</button>
+        <button onclick="testAll()">Test Todo</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+
+        async function testEndpoint(name, method, endpoint, body = null) {
+            const resultsDiv = document.getElementById('results');
+            const testDiv = document.createElement('div');
+            testDiv.className = 'test-section';
+            
+            testDiv.innerHTML = `<h3>🔄 Testing: ${name}</h3><p>Cargando...</p>`;
+            resultsDiv.appendChild(testDiv);
+
+            try {
+                const options = {
+                    method: method,
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(`${API_URL}${endpoint}`, options);
+                const data = await response.json();
+
+                testDiv.className = 'test-section ' + (response.ok ? 'success' : 'error');
+                testDiv.innerHTML = `
+                    <h3>${response.ok ? '✅' : '❌'} ${name}</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>URL:</strong> ${method} ${endpoint}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                testDiv.className = 'test-section error';
+                testDiv.innerHTML = `
+                    <h3>❌ ${name}</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <pre>${error.stack}</pre>
+                `;
+            }
+        }
+
+        async function testHealth() {
+            await testEndpoint('Health Check', 'GET', '/api/health');
+        }
+
+        async function testConsultorios() {
+            await testEndpoint('Consultorios', 'GET', '/api/consultorios');
+        }
+
+        async function testAtenciones() {
+            await testEndpoint('Atenciones', 'GET', '/api/atenciones');
+        }
+
+        async function testLogin() {
+            await testEndpoint('Login', 'POST', '/api/auth/login', {
+                username: 'Juan Pérez López',
+                password: 'prac123'
+            });
+        }
+
+        async function testAll() {
+            document.getElementById('results').innerHTML = '';
+            await testHealth();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testConsultorios();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testAtenciones();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await testLogin();
+        }
+    </script>
+</body>
+</html>

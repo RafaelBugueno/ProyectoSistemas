@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { LogOut, CheckCircle2, Activity, QrCode, RefreshCw } from "lucide-react";
 import { toast } from "./ui/sonner";
 import { Badge } from "./ui/badge";
+import { apiRequest } from "../api/config";
 
 interface KinesiologoPageProps {
   user: any;
@@ -14,9 +15,13 @@ interface KinesiologoPageProps {
 
 export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
   const [tratamiento, setTratamiento] = useState("");
+  const [consultorioSeleccionado, setConsultorioSeleccionado] = useState("");
+  const [consultorios, setConsultorios] = useState<string[]>([]);
+  const [tiposAtencion, setTiposAtencion] = useState<string[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [showQR, setShowQR] = useState(false);
 
 const obtenerUbicacion = () => {
@@ -52,82 +57,167 @@ const obtenerUbicacion = () => {
   }
 };
 
-const handleSincronizarDatos = () => {
-  obtenerUbicacion();
-  toast.success("Datos sincronizados correctamente");
+const cargarDatosIniciales = async () => {
+  try {
+    setLoadingData(true);
+    
+    // Cargar consultorios
+    const responseConsultorios = await apiRequest("/api/consultorios");
+    if (responseConsultorios.status === "ok" && responseConsultorios.data) {
+      const nombresConsultorios = responseConsultorios.data.map((c: any) => c.nombre);
+      setConsultorios(nombresConsultorios);
+      
+      // Establecer el consultorio del usuario como predeterminado
+      if (user.consultorio && nombresConsultorios.includes(user.consultorio)) {
+        setConsultorioSeleccionado(user.consultorio);
+      }
+    }
+    
+    // Cargar tipos de atención
+    const responseTipos = await apiRequest("/api/tipos-atencion");
+    if (responseTipos.status === "ok" && responseTipos.data) {
+      const nombresTipos = responseTipos.data.map((t: any) => t.nombre);
+      setTiposAtencion(nombresTipos);
+    }
+    
+    setLoadingData(false);
+  } catch (error) {
+    console.error("Error cargando datos iniciales:", error);
+    toast.error("Error al cargar datos. Usando valores por defecto.");
+    
+    // Fallback: usar consultorio del usuario si está disponible
+    if (user.consultorio) {
+      setConsultorios([user.consultorio]);
+      setConsultorioSeleccionado(user.consultorio);
+    }
+    setLoadingData(false);
+  }
 };
 
-  const tratamientos = [
-    "Rehabilitación Traumatológica",
-    "Terapia Deportiva",
-    "Masoterapia",
-    "Electroterapia",
-    "Kinesiología Respiratoria",
-    "Rehabilitación Neurológica",
-    "Ejercicios Terapéuticos",
-    "Reeducación Postural",
-    "Drenaje Linfático",
-    "Terapia Manual",
-    "Ultrasonido Terapéutico",
-    "Crioterapia",
-  ];
+const handleSincronizarDatos = async () => {
+  try {
+    // Obtener registros del localStorage
+    const registrosLocales = JSON.parse(localStorage.getItem("registros") || "[]");
+    
+    console.log("🔄 Iniciando sincronización...");
+    console.log("Registros a sincronizar:", registrosLocales.length);
+    console.log("Datos:", registrosLocales);
+    
+    if (registrosLocales.length === 0) {
+      toast.success("No hay registros pendientes para sincronizar");
+      return;
+    }
 
-    useEffect(() => {
+    // Enviar al backend
+    const response = await apiRequest("/api/sincronizar", {
+      method: "POST",
+      body: JSON.stringify({ atenciones: registrosLocales }),
+    });
+    
+    console.log("Respuesta de sincronización:", response);
+
+    if (response.status === "ok" || response.status === "partial") {
+      toast.success(`${response.exitosos} registros sincronizados correctamente`);
+      
+      if (response.fallidos > 0) {
+        toast.error(`${response.fallidos} registros fallaron al sincronizar`);
+      }
+      
+      // Limpiar localStorage después de sincronización exitosa
+      if (response.status === "ok") {
+        localStorage.removeItem("registros");
+      }
+    }
+    
+    // Actualizar ubicación
     obtenerUbicacion();
+  } catch (error) {
+    toast.error("Error al sincronizar datos. Intenta nuevamente.");
+    console.error("Error en sincronización:", error);
+  }
+};
+
+  useEffect(() => {
+    obtenerUbicacion();
+    cargarDatosIniciales();
   }, []);
 
 
-  const handleRegistrar = () => {
+  const handleRegistrar = async () => {
     if (!tratamiento) {
-      toast.error("Por favor selecciona un tratamiento");
+      toast.error("Por favor selecciona un tipo de atención");
+      return;
+    }
+
+    if (!consultorioSeleccionado) {
+      toast.error("Por favor selecciona un consultorio");
       return;
     }
 
     setLoading(true);
 
-    // Simular petición
-    setTimeout(() => {
+    try {
       const ahora = new Date();
-
-      const consultoriosGuardados = localStorage.getItem("consultorios");
-      const consultorioActivoId = localStorage.getItem("consultorioActivoId");
-      let consultorioNombre: string | null = null;
-
-      if (consultoriosGuardados && consultorioActivoId) {
-        try {
-          const lista = JSON.parse(consultoriosGuardados) as { id: number; nombre: string }[];
-          const encontrado = lista.find((c) => String(c.id) === consultorioActivoId);
-          if (encontrado) {
-            consultorioNombre = encontrado.nombre;
-          }
-        } catch {
-          consultorioNombre = null;
-        }
-      }
+      const fechaSolo = ahora.toISOString().split('T')[0]; // YYYY-MM-DD
+      const horaSolo = ahora.toLocaleTimeString("es-ES", { hour: '2-digit', minute: '2-digit', second: '2-digit' }); // HH:MM:SS
 
       const registro = {
         id: Date.now(),
-        kinesiologo_id: user.id,
-        kinesiologo_nombre: user.nombre,
-        especialidad: user.especialidad,
-        tratamiento,
-        consultorioId: consultorioActivoId ? Number(consultorioActivoId) : null,
-        consultorioNombre,
-        fecha: ahora.toLocaleDateString("es-ES"),
-        hora: ahora.toLocaleTimeString("es-ES"),
+        nombre_practicante: user.nombre,
+        tipo_atencion: tratamiento,
+        consultorio: consultorioSeleccionado,
+        fecha: ahora.toISOString(), // Para backend (timestamp completo)
+        fechaSolo: fechaSolo, // Para mostrar en admin
+        hora: horaSolo,
         latitud: location?.lat || 0,
         longitud: location?.lng || 0,
       };
 
-      // Guardar en localStorage
-      const registros = JSON.parse(localStorage.getItem("registros") || "[]");
-      registros.push(registro);
-      localStorage.setItem("registros", JSON.stringify(registros));
+      // Intentar guardar en el backend primero
+      try {
+        console.log("Enviando atención al backend:", {
+          fecha: registro.fecha,
+          consultorio: consultorioSeleccionado,
+          tipo_atencion: tratamiento,
+          nombre_practicante: user.nombre,
+          latitud: registro.latitud,
+          longitud: registro.longitud,
+        });
+        
+        const response = await apiRequest("/api/atenciones", {
+          method: "POST",
+          body: JSON.stringify({
+            fecha: registro.fecha,
+            consultorio: consultorioSeleccionado,
+            tipo_atencion: tratamiento,
+            nombre_practicante: user.nombre,
+            latitud: registro.latitud,
+            longitud: registro.longitud,
+          }),
+        });
+        
+        console.log("Respuesta del backend:", response);
+        toast.success("Sesión registrada y sincronizada correctamente");
+      } catch (error: any) {
+        // Si falla, guardar en localStorage para sincronizar después
+        console.error("Error al sincronizar:", error);
+        console.error("Mensaje de error:", error.message);
+        
+        const registros = JSON.parse(localStorage.getItem("registros") || "[]");
+        registros.push(registro);
+        localStorage.setItem("registros", JSON.stringify(registros));
+        
+        toast.error(`Sesión guardada localmente: ${error.message}`);
+      }
 
-      toast.success("Sesión registrada correctamente");
       setTratamiento("");
+      // Mantener el consultorio seleccionado para facilitar registros múltiples
       setLoading(false);
-    }, 500);
+    } catch (error) {
+      console.error("Error al registrar:", error);
+      toast.error("Error al registrar la sesión");
+      setLoading(false);
+    }
   };
 
   // Datos para el código QR
@@ -235,34 +325,71 @@ const handleSincronizarDatos = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
-              <div className="space-y-2">
-                <Label htmlFor="tratamiento" className="text-gray-700">Tipo de Tratamiento</Label>
-                <Select value={tratamiento} onValueChange={setTratamiento}>
-                  <SelectTrigger id="tratamiento" className="border-gray-300">
-                    <SelectValue placeholder="Selecciona el tratamiento realizado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tratamientos.map((trat) => (
-                      <SelectItem key={trat} value={trat}>
-                        {trat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 mt-2">
-                  La fecha, hora y ubicación se registrarán automáticamente
-                </p>
-              </div>
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-8 w-8 animate-spin text-cyan-600" />
+                  <span className="ml-2 text-gray-600">Cargando datos...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="consultorio" className="text-gray-700">Consultorio</Label>
+                    <Select value={consultorioSeleccionado} onValueChange={setConsultorioSeleccionado}>
+                      <SelectTrigger id="consultorio" className="border-gray-300">
+                        <SelectValue placeholder="Selecciona el consultorio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {consultorios.length > 0 ? (
+                          consultorios.map((consultorio) => (
+                            <SelectItem key={consultorio} value={consultorio}>
+                              {consultorio}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="Sin consultorio" disabled>
+                            No hay consultorios disponibles
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <Button
-                onClick={handleRegistrar}
-                disabled={loading || !tratamiento}
-                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
-                size="lg"
-              >
-                <CheckCircle2 className="mr-2 h-5 w-5" />
-                {loading ? "Registrando Sesión..." : "Registrar Sesión"}
-              </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="tratamiento" className="text-gray-700">Tipo de Atención</Label>
+                    <Select value={tratamiento} onValueChange={setTratamiento}>
+                      <SelectTrigger id="tratamiento" className="border-gray-300">
+                        <SelectValue placeholder="Selecciona el tipo de atención" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tiposAtencion.length > 0 ? (
+                          tiposAtencion.map((tipo) => (
+                            <SelectItem key={tipo} value={tipo}>
+                              {tipo}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="Sin tipo" disabled>
+                            No hay tipos de atención disponibles
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-2">
+                      La fecha, hora y ubicación se registrarán automáticamente
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleRegistrar}
+                    disabled={loading || !tratamiento || !consultorioSeleccionado}
+                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
+                    size="lg"
+                  >
+                    <CheckCircle2 className="mr-2 h-5 w-5" />
+                    {loading ? "Registrando Sesión..." : "Registrar Sesión"}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 

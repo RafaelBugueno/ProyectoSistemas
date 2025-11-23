@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.responses import JSONResponse
 import agregar as agregar
 import seleccionar as seleccionar
 import eliminar as eliminar
@@ -7,6 +8,7 @@ import actualizar as actualizar
 # from utils import auth  # TODO: Implementar módulo de autenticación
 from pydantic import BaseModel
 from typing import Optional
+import traceback
 
 # Modelos Pydantic para request/response #
 
@@ -40,6 +42,9 @@ class AdministradorCreate(BaseModel):
     password: str
     rut: str
 
+class SincronizarRequest(BaseModel):
+    atenciones: list[dict]  # Lista de atenciones del localStorage
+
 
 # TODO: Implementar autenticación con JWT
 # def getCurrentUser(authorization: Optional[str] = Header(None)):
@@ -62,17 +67,44 @@ class AdministradorCreate(BaseModel):
 
 app = FastAPI(title="Proyecto Kinesiologia")
 
-# CORS para desarrollo (React Vite en 5173) #
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Middleware para logging de requests (declarado PRIMERO para ejecutarse ÚLTIMO)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"🔵 {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        print(f"✅ {request.method} {request.url.path} - Status: {response.status_code}")
+        return response
+    except Exception as e:
+        print(f"❌ {request.method} {request.url.path} - Error: {str(e)}")
+        traceback.print_exc()
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e), "status": "error"}
+        )
+
+# Middleware para manejar CORS (declarado ÚLTIMO para ejecutarse PRIMERO)
+@app.middleware("http")
+async def cors_handler(request: Request, call_next):
+    # Si es OPTIONS, responder inmediatamente con headers CORS
+    if request.method == "OPTIONS":
+        return JSONResponse(
+            content={},
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": request.headers.get("access-control-request-headers", "*"),
+                "Access-Control-Allow-Credentials": "true",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    
+    # Para otras requests, procesarlas normalmente y agregar headers CORS
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("origin", "*")
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 
 
@@ -95,13 +127,24 @@ def health():
 @app.post("/api/auth/login")
 def login(credentials: LoginRequest):
     """
-    Endpoint de login - verifica credenciales contra la base de datos
+    Endpoint de login - verifica credenciales contra la base de datos usando RUT
     """
+    print(f"🔑 Intento de login - RUT: {credentials.username}")
+    
     # Verificar si es administrador
-    resultado_admin = seleccionar.seleccionarAdministradorPorNombre(credentials.username)
-    if resultado_admin["status"] == "ok" and resultado_admin["data"]:
+    resultado_admin = seleccionar.seleccionarAdministradorPorRut(credentials.username)
+    
+    if resultado_admin["status"] == "error":
+        print(f"❌ Error de BD al buscar administrador: {resultado_admin.get('message')}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión con la base de datos. Verifica que PostgreSQL esté en ejecución."
+        )
+    
+    if resultado_admin["data"]:
         admin = resultado_admin["data"][0]
-        if admin["password"] == credentials.password:  # TODO: Implementar bcrypt
+        if admin["password"] == credentials.password:
+            print(f"✅ Login exitoso - Admin: {admin['nombre']}")
             return {
                 "status": "ok",
                 "user": {
@@ -110,23 +153,40 @@ def login(credentials: LoginRequest):
                     "rut": admin["rut"]
                 }
             }
+        else:
+            print(f"⚠️ Contraseña incorrecta para administrador RUT: {credentials.username}")
     
     # Verificar si es practicante
-    resultado_practicante = seleccionar.seleccionarPracticantePorNombre(credentials.username)
-    if resultado_practicante["status"] == "ok" and resultado_practicante["data"]:
+    resultado_practicante = seleccionar.seleccionarPracticantePorRut(credentials.username)
+    
+    if resultado_practicante["status"] == "error":
+        print(f"❌ Error de BD al buscar practicante: {resultado_practicante.get('message')}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error de conexión con la base de datos. Verifica que PostgreSQL esté en ejecución."
+        )
+    
+    if resultado_practicante["data"]:
         practicante = resultado_practicante["data"][0]
-        if practicante["password"] == credentials.password:  # TODO: Implementar bcrypt
+        if practicante["password"] == credentials.password:
+            print(f"✅ Login exitoso - Practicante: {practicante['nombre']}")
             return {
                 "status": "ok",
                 "user": {
                     "nombre": practicante["nombre"],
-                    "tipo": "practicante",
+                    "tipo": "kinesiologo",
                     "rut": practicante["rut"],
                     "consultorio": practicante["consultorio"]
                 }
             }
+        else:
+            print(f"⚠️ Contraseña incorrecta para practicante RUT: {credentials.username}")
     
-    raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    print(f"❌ RUT no encontrado: {credentials.username}")
+    raise HTTPException(
+        status_code=401,
+        detail="RUT o contraseña incorrectos. Verifica tus credenciales."
+    )
 
 
 # ============================================
@@ -242,6 +302,13 @@ def obtener_atenciones(
 @app.post("/api/atenciones")
 def crear_atencion(atencion: AtencionCreate):
     """Registra una nueva atención"""
+    print(f"📝 Registrando atención:")
+    print(f"   Fecha: {atencion.fecha}")
+    print(f"   Consultorio: {atencion.consultorio}")
+    print(f"   Tipo: {atencion.tipo_atencion}")
+    print(f"   Practicante: {atencion.nombre_practicante}")
+    print(f"   Ubicación: ({atencion.latitud}, {atencion.longitud})")
+    
     resultado = agregar.agregarRegistroAtencion(
         atencion.fecha,
         atencion.consultorio,
@@ -250,8 +317,12 @@ def crear_atencion(atencion: AtencionCreate):
         atencion.latitud or 0.0,
         atencion.longitud or 0.0
     )
+    
     if resultado["status"] == "ok":
+        print(f"✅ Atención registrada exitosamente")
         return {"status": "ok", "message": "Atención registrada exitosamente"}
+    
+    print(f"❌ Error al registrar atención: {resultado.get('message')}")
     raise HTTPException(status_code=500, detail=resultado.get("message", "Error al registrar atención"))
 
 @app.delete("/api/atenciones/{id}")
@@ -298,4 +369,110 @@ def obtener_estadisticas_resumen():
             "ultima_atencion": ultima_atencion,
             "ubicaciones_unicas": len(ubicaciones_unicas)
         }
+    }
+
+
+# ============================================
+# ENDPOINTS PARA FILTROS DINÁMICOS
+# ============================================
+
+@app.get("/api/practicantes/activos")
+def obtener_practicantes_activos():
+    """Obtiene nombres únicos de practicantes que tienen al menos 1 atención registrada"""
+    atenciones = seleccionar.seleccionarTodasLasAtenciones()
+    if atenciones["status"] == "ok":
+        nombres_unicos = sorted(list(set([a["nombre_practicante"] for a in atenciones["data"]])))
+        return {"status": "ok", "data": nombres_unicos}
+    raise HTTPException(status_code=500, detail="Error al obtener practicantes activos")
+
+@app.get("/api/tipos-atencion/usados")
+def obtener_tipos_usados():
+    """Obtiene tipos de atención que han sido usados en al menos 1 atención"""
+    atenciones = seleccionar.seleccionarTodasLasAtenciones()
+    if atenciones["status"] == "ok":
+        tipos_unicos = sorted(list(set([a["tipo_atencion"] for a in atenciones["data"]])))
+        return {"status": "ok", "data": tipos_unicos}
+    raise HTTPException(status_code=500, detail="Error al obtener tipos usados")
+
+
+# ============================================
+# ENDPOINT DE SINCRONIZACIÓN
+# ============================================
+
+@app.post("/api/sincronizar")
+def sincronizar_datos(sync_request: SincronizarRequest):
+    """
+    Sincroniza atenciones del localStorage con la base de datos
+    Recibe un array de atenciones y las inserta en batch
+    """
+    print(f"\n🔄 Iniciando sincronización de {len(sync_request.atenciones)} registros")
+    exitosos = 0
+    fallidos = 0
+    errores = []
+    
+    for i, atencion in enumerate(sync_request.atenciones, 1):
+        try:
+            # Extraer datos del objeto localStorage (formato del frontend)
+            fecha = atencion.get("fecha")
+            consultorio = atencion.get("consultorio") or "Sin consultorio"
+            tipo_atencion = atencion.get("tratamiento")
+            nombre_practicante = atencion.get("kinesiologo_nombre")
+            latitud = atencion.get("latitud", 0.0)
+            longitud = atencion.get("longitud", 0.0)
+            
+            print(f"  [{i}/{len(sync_request.atenciones)}] Procesando:")
+            print(f"    - Fecha: {fecha}")
+            print(f"    - Consultorio: {consultorio}")
+            print(f"    - Tipo: {tipo_atencion}")
+            print(f"    - Practicante: {nombre_practicante}")
+            
+            # Validar campos requeridos
+            if not all([fecha, consultorio, tipo_atencion, nombre_practicante]):
+                print(f"    ❌ Campos faltantes")
+                fallidos += 1
+                errores.append({
+                    "atencion_id": atencion.get("id"), 
+                    "error": "Campos requeridos faltantes"
+                })
+                continue
+            
+            # Insertar en la base de datos
+            resultado = agregar.agregarRegistroAtencion(
+                fecha,
+                consultorio,
+                tipo_atencion,
+                nombre_practicante,
+                latitud,
+                longitud
+            )
+            
+            if resultado["status"] == "ok":
+                print(f"    ✅ Sincronizado exitosamente")
+                exitosos += 1
+            else:
+                print(f"    ❌ Error: {resultado.get('message')}")
+                fallidos += 1
+                errores.append({"atencion_id": atencion.get("id"), "error": resultado.get("message")})
+        except Exception as e:
+            print(f"    ❌ Excepción: {str(e)}")
+            fallidos += 1
+            errores.append({"atencion_id": atencion.get("id"), "error": str(e)})
+    
+    # Determinar el status de la respuesta
+    if fallidos == 0:
+        status = "ok"
+        print(f"\n✅ Sincronización completa: {exitosos} registros")
+    elif exitosos == 0:
+        status = "error"
+        print(f"\n❌ Sincronización fallida: {fallidos} registros con error")
+    else:
+        status = "partial"
+        print(f"\n⚠️ Sincronización parcial: {exitosos} exitosos, {fallidos} fallidos")
+    
+    return {
+        "status": status,
+        "exitosos": exitosos,
+        "fallidos": fallidos,
+        "total": len(sync_request.atenciones),
+        "errores": errores if errores else None
     }

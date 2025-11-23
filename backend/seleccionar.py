@@ -50,3 +50,11 @@ def seleccionarPracticantePorNombre(nombre: str):
 def seleccionarAdministradorPorNombre(nombre: str):
     query = f"SELECT * FROM administrador WHERE nombre = '{nombre}';"
     return SELECT(query)
+
+def seleccionarPracticantePorRut(rut: str):
+    query = f"SELECT * FROM practicante WHERE rut = '{rut}';"
+    return SELECT(query)
+
+def seleccionarAdministradorPorRut(rut: str):
+    query = f"SELECT * FROM administrador WHERE rut = '{rut}';"
+    return SELECT(query)

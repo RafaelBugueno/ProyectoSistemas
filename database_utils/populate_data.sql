@@ -51,9 +51,9 @@ INSERT INTO tipo_atencion (nombre) VALUES
 -- Ajustar cantidad: Actualmente 3 administradores
 -- NOTA: Las contraseñas están en texto plano - implementar hashing en el backend
 INSERT INTO administrador (nombre, password, rut) VALUES
-('Dr. Carlos Administrador', 'admin123', '12345678-9'),
-('Dra. María González Admin', 'admin456', '11111111-1'),
-('Dr. Pedro Supervisor', 'admin789', '22222222-2');
+('Dr. Carlos Administrador', 'admin123', '11111111-1'),
+('Dra. María González Admin', 'admin456', '12345678-9'),
+('Dr. Pedro Supervisor', 'admin789', '33333333-3');
 
 -- ============================================
 -- TABLA: practicante
@@ -61,7 +61,7 @@ INSERT INTO administrador (nombre, password, rut) VALUES
 -- Ajustar cantidad: Actualmente 20 practicantes
 -- NOTA: Las contraseñas están en texto plano - implementar hashing en el backend
 INSERT INTO practicante (nombre, password, rut, consultorio) VALUES
-('Juan Pérez López', 'prac123', '16789012-3', 'Consultorio Central'),
+('Juan Pérez López', 'prac123', '22222222-2', 'Consultorio Central'),
 ('María González Silva', 'prac123', '17890123-4', 'Clínica Las Condes'),
 ('Carlos Rodríguez Muñoz', 'prac123', '18901234-5', 'Centro Médico Providencia'),
 ('Ana Martínez Torres', 'prac123', '19012345-6', 'Hospital Clínico Universidad de Chile'),

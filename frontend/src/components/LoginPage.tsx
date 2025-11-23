@@ -4,35 +4,60 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Heart } from "lucide-react";
+import { apiRequest } from "../api/config";
+import { toast } from "./ui/simple-toast";
 
 interface LoginPageProps {
   onLogin: (user: any) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  const [username, setUsername] = useState("");
+  const [rut, setRut] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    // Usuarios predefinidos
-    const users = [
-      { id: 1, username: "admin", password: "admin123", tipo: "admin", nombre: "Dr. Admin", especialidad: "Administrador" },
-      { id: 2, username: "kinesiologo", password: "kine123", tipo: "kinesiologo", nombre: "Lic. Juan Pérez", especialidad: "Kinesiología Deportiva" },
-      { id: 3, username: "kinesiologo2", password: "kine123", tipo: "kinesiologo", nombre: "Lic. María González", especialidad: "Kinesiología Traumatológica" },
-    ];
+    try {
+      const response = await apiRequest("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          username: rut,
+          password: password
+        })
+      });
 
-    const user = users.find(
-      (u) => u.username === username && u.password === password
-    );
-
-    if (user) {
-      onLogin(user);
-    } else {
-      setError("Usuario o contraseña incorrectos");
+      if (response.status === "ok" && response.user) {
+        toast.success(`Bienvenido ${response.user.nombre}`);
+        onLogin(response.user);
+      } else {
+        setError("RUT o contraseña incorrectos");
+      }
+    } catch (err: any) {
+      console.error("Error en login:", err);
+      
+      // Determinar el tipo de error
+      const errorMessage = err.message || "Error desconocido";
+      
+      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
+        setError("No se pudo conectar con el servidor. Verifica que el backend esté en ejecución en el puerto 8000.");
+        toast.error("Servidor no disponible");
+      } else if (errorMessage.includes("base de datos") || errorMessage.includes("PostgreSQL")) {
+        setError("Error de base de datos. Verifica que PostgreSQL esté en ejecución.");
+        toast.error("Error de base de datos");
+      } else if (errorMessage.includes("incorrectos") || errorMessage.includes("inválidas")) {
+        setError("RUT o contraseña incorrectos. Verifica tus credenciales.");
+        toast.error("Credenciales incorrectas");
+      } else {
+        setError(errorMessage);
+        toast.error("Error al iniciar sesión");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,15 +83,16 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-gray-700">Usuario</Label>
+              <Label htmlFor="rut" className="text-gray-700">RUT</Label>
               <Input
-                id="username"
+                id="rut"
                 type="text"
-                placeholder="Ingresa tu usuario"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Ejemplo: 12345678-9"
+                value={rut}
+                onChange={(e) => setRut(e.target.value)}
                 className="border-gray-300"
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -79,22 +105,27 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 className="border-gray-300"
                 required
+                disabled={loading}
               />
             </div>
             {error && (
               <div className="text-red-600 text-sm text-center bg-red-50 p-2 rounded-md">{error}</div>
             )}
-            <Button type="submit" className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700">
-              Acceder al Sistema
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700"
+              disabled={loading}
+            >
+              {loading ? "Verificando..." : "Acceder al Sistema"}
             </Button>
           </form>
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-600 text-center mb-3">
-              Usuarios de prueba:
+              Credenciales de prueba:
             </p>
             <div className="text-xs text-gray-500 space-y-2 bg-gray-50 p-3 rounded-md">
-              <p><span className="text-gray-700">Administrador:</span> usuario: <span className="font-mono bg-white px-1 rounded">admin</span> / contraseña: <span className="font-mono bg-white px-1 rounded">admin123</span></p>
-              <p><span className="text-gray-700">Kinesiólogo:</span> usuario: <span className="font-mono bg-white px-1 rounded">kinesiologo</span> / contraseña: <span className="font-mono bg-white px-1 rounded">kine123</span></p>
+              <p><span className="text-gray-700">Administrador:</span> RUT: <span className="font-mono bg-white px-1 rounded">11111111-1</span> / contraseña: <span className="font-mono bg-white px-1 rounded">admin123</span></p>
+              <p><span className="text-gray-700">Practicante:</span> RUT: <span className="font-mono bg-white px-1 rounded">22222222-2</span> / contraseña: <span className="font-mono bg-white px-1 rounded">prac123</span></p>
             </div>
           </div>
         </CardContent>

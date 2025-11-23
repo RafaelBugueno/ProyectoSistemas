@@ -2,11 +2,16 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { LogOut, Activity, MapPin, FileText, Calendar, Shield, Stethoscope, Filter, X, Search, Building2 } from "lucide-react";
+import { LogOut, Activity, MapPin, FileText, Calendar, Shield, Stethoscope, Filter, X, Search, Building2, Download, FileSpreadsheet } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Label } from "./ui/label";
+import { apiRequest } from "../api/config";
+import { toast } from "./ui/sonner";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface AdminPageProps {
   user: any;
@@ -33,12 +38,54 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [nuevoConsultorioNombre, setNuevoConsultorioNombre] = useState<string>("");
   const [nuevoConsultorioDireccion, setNuevoConsultorioDireccion] = useState<string>("");
 
-  const cargarRegistros = () => {
-    const data = JSON.parse(localStorage.getItem("registros") || "[]");
-    setRegistros(data.reverse()); // Mostrar los más recientes primero
+  const cargarRegistros = async () => {
+    console.log("🔄 AdminPage: Cargando registros...");
+    try {
+      // Intentar cargar desde el backend
+      const response = await apiRequest("/api/atenciones");
+      console.log("📊 AdminPage: Respuesta de atenciones:", response);
+      if (response.status === "ok") {
+        console.log("✅ AdminPage: Registros cargados desde backend:", response.data?.length || 0);
+        setRegistros(response.data || []);
+        return;
+      }
+    } catch (error) {
+      console.warn("⚠️ AdminPage: Error al cargar desde backend, usando localStorage:", error);
+    }
+    
+    // Fallback a localStorage si falla el backend
+    try {
+      const data = JSON.parse(localStorage.getItem("registros") || "[]");
+      console.log("💾 AdminPage: Registros cargados desde localStorage:", data.length);
+      setRegistros(data.reverse());
+    } catch (error) {
+      console.error("❌ AdminPage: Error al parsear localStorage:", error);
+      setRegistros([]);
+    }
   };
 
-  const cargarConsultorios = () => {
+  const cargarConsultorios = async () => {
+    console.log("🏥 AdminPage: Cargando consultorios...");
+    try {
+      // Intentar cargar desde el backend
+      const response = await apiRequest("/api/consultorios");
+      console.log("🏢 AdminPage: Respuesta de consultorios:", response);
+      if (response.status === "ok") {
+        const consultoriosBackend = response.data.map((c: any) => ({
+          id: c.id || Math.random(),
+          nombre: c.nombre,
+          direccion: c.direccion,
+        }));
+        console.log("✅ AdminPage: Consultorios cargados desde backend:", consultoriosBackend.length);
+        setConsultorios(consultoriosBackend);
+        localStorage.setItem("consultorios", JSON.stringify(consultoriosBackend));
+        return;
+      }
+    } catch (error) {
+      console.warn("⚠️ AdminPage: Error al cargar consultorios desde backend, usando localStorage:", error);
+    }
+    
+    // Fallback a localStorage
     const consultoriosGuardados = localStorage.getItem("consultorios");
     let consultoriosIniciales: Consultorio[] = [];
 
@@ -84,8 +131,19 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   };
 
   useEffect(() => {
-    cargarRegistros();
-    cargarConsultorios();
+    console.log("🚀 AdminPage: Componente montado, iniciando carga de datos...");
+    console.log("👤 Usuario actual:", user);
+    
+    const inicializar = async () => {
+      try {
+        await Promise.all([cargarRegistros(), cargarConsultorios()]);
+        console.log("✅ AdminPage: Datos iniciales cargados correctamente");
+      } catch (error) {
+        console.error("❌ AdminPage: Error al inicializar:", error);
+      }
+    };
+    
+    inicializar();
   }, []);
 
   const limpiarFiltros = () => {
@@ -167,12 +225,12 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   // Obtener listas únicas para filtros
   const kinesiologosUnicos = useMemo(() => {
-    const nombres = new Set(registros.map((r) => r.kinesiologo_nombre || r.practicante_nombre));
+    const nombres = new Set(registros.map((r) => r.nombre_practicante || r.kinesiologo_nombre || r.practicante_nombre).filter(Boolean));
     return Array.from(nombres).sort();
   }, [registros]);
 
   const tratamientosUnicos = useMemo(() => {
-    const tratamientos = new Set(registros.map((r) => r.tratamiento || r.actividad));
+    const tratamientos = new Set(registros.map((r) => r.tipo_atencion || r.tratamiento || r.actividad).filter(Boolean));
     return Array.from(tratamientos).sort();
   }, [registros]);
 
@@ -180,8 +238,9 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     const nombres = new Set<string>();
 
     registros.forEach((r) => {
-      if (r.consultorioNombre) {
-        nombres.add(r.consultorioNombre);
+      const nombreConsultorio = r.consultorio || r.consultorioNombre;
+      if (nombreConsultorio) {
+        nombres.add(nombreConsultorio);
       }
     });
 
@@ -207,9 +266,9 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   // Aplicar filtros
   const registrosFiltrados = useMemo(() => {
     return registros.filter((registro) => {
-      const nombreKinesiologo = registro.kinesiologo_nombre || registro.practicante_nombre;
-      const tratamiento = registro.tratamiento || registro.actividad;
-      const nombreConsultorio = registro.consultorioNombre || "";
+      const nombreKinesiologo = registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "";
+      const tratamiento = registro.tipo_atencion || registro.tratamiento || registro.actividad || "";
+      const nombreConsultorio = registro.consultorio || registro.consultorioNombre || "";
       
       // Filtro por kinesiólogo
       if (filtroKinesiologo !== "todos" && nombreKinesiologo !== filtroKinesiologo) {
@@ -280,6 +339,104 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     filtroFechaFin !== "" ||
     filtroBusqueda !== "";
 
+  const generarExcel = () => {
+    try {
+      // Preparar datos para el Excel
+      const datosExcel = registrosFiltrados.map((registro) => ({
+        "Profesional": registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "Sin nombre",
+        "Tratamiento": registro.tipo_atencion || registro.tratamiento || registro.actividad || "Sin especificar",
+        "Consultorio": registro.consultorio || registro.consultorioNombre || "No asignado",
+        "Fecha": registro.fechaSolo || registro.fecha?.split('T')[0] || "Sin fecha",
+        "Hora": registro.hora || "Sin hora",
+        "Latitud": registro.latitud || 0,
+        "Longitud": registro.longitud || 0,
+      }));
+
+      // Crear libro de Excel
+      const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Sesiones Clínicas");
+
+      // Ajustar ancho de columnas
+      const maxWidth = 30;
+      worksheet['!cols'] = [
+        { wch: 25 }, // Profesional
+        { wch: 25 }, // Tratamiento
+        { wch: 25 }, // Consultorio
+        { wch: 12 }, // Fecha
+        { wch: 10 }, // Hora
+        { wch: 12 }, // Latitud
+        { wch: 12 }, // Longitud
+      ];
+
+      // Generar nombre de archivo con fecha actual
+      const fecha = new Date().toISOString().split('T')[0];
+      const nombreArchivo = `sesiones_clinicas_${fecha}.xlsx`;
+
+      // Descargar archivo
+      XLSX.writeFile(workbook, nombreArchivo);
+      toast.success(`Excel generado: ${registrosFiltrados.length} registros exportados`);
+    } catch (error) {
+      console.error("Error al generar Excel:", error);
+      toast.error("Error al generar el archivo Excel");
+    }
+  };
+
+  const generarPDF = () => {
+    try {
+      const doc = new jsPDF();
+
+      // Título
+      doc.setFontSize(18);
+      doc.text("Historial de Sesiones Clínicas", 14, 20);
+
+      // Fecha de generación
+      doc.setFontSize(10);
+      doc.text(`Generado el: ${new Date().toLocaleString('es-ES')}`, 14, 28);
+      doc.text(`Total de registros: ${registrosFiltrados.length}`, 14, 33);
+
+      // Preparar datos para la tabla
+      const datosTabla = registrosFiltrados.map((registro) => [
+        registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "Sin nombre",
+        registro.tipo_atencion || registro.tratamiento || registro.actividad || "Sin especificar",
+        registro.consultorio || registro.consultorioNombre || "No asignado",
+        registro.fechaSolo || registro.fecha?.split('T')[0] || "Sin fecha",
+        registro.hora || "Sin hora",
+      ]);
+
+      // Generar tabla
+      autoTable(doc, {
+        head: [["Profesional", "Tratamiento", "Consultorio", "Fecha", "Hora"]],
+        body: datosTabla,
+        startY: 40,
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [37, 99, 235], // bg-blue-600
+          textColor: 255,
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [239, 246, 255], // bg-blue-50
+        },
+        margin: { top: 40 },
+      });
+
+      // Generar nombre de archivo con fecha actual
+      const fecha = new Date().toISOString().split('T')[0];
+      const nombreArchivo = `sesiones_clinicas_${fecha}.pdf`;
+
+      // Descargar archivo
+      doc.save(nombreArchivo);
+      toast.success(`PDF generado: ${registrosFiltrados.length} registros exportados`);
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
+      toast.error("Error al generar el archivo PDF");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-4">
       <div className="max-w-7xl mx-auto">
@@ -341,7 +498,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                 </Label>
                 <Select
                   value={consultorioActivoId ? String(consultorioActivoId) : ""}
-                  onValueChange={(value) => {
+                  onValueChange={(value: string) => {
                     if (!value) {
                       manejarCambioConsultorioActivo(null);
                       return;
@@ -648,6 +805,24 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   Registro completo de tratamientos kinesiológicos
                 </CardDescription>
               </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={generarExcel}
+                  disabled={registrosFiltrados.length === 0}
+                  className="btn-export-excel"
+                >
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Generar Excel
+                </Button>
+                <Button
+                  onClick={generarPDF}
+                  disabled={registrosFiltrados.length === 0}
+                  className="btn-export-pdf"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Generar PDF
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -688,10 +863,10 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white">
-                                {(registro.kinesiologo_nombre || registro.practicante_nombre).charAt(0)}
+                                {(registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "?").charAt(0).toUpperCase()}
                               </div>
                               <span className="text-gray-900">
-                                {registro.kinesiologo_nombre || registro.practicante_nombre}
+                                {registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "Sin nombre"}
                               </span>
                             </div>
                           </TableCell>
@@ -702,14 +877,14 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                           </TableCell>
                           <TableCell>
                             <Badge className="bg-blue-600">
-                              {registro.tratamiento || registro.actividad}
+                              {registro.tipo_atencion || registro.tratamiento || registro.actividad || "Sin especificar"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-gray-700">
-                            {registro.consultorioNombre || "No asignado"}
+                            {registro.consultorio || registro.consultorioNombre || "No asignado"}
                           </TableCell>
-                          <TableCell className="text-gray-700">{registro.fecha}</TableCell>
-                          <TableCell className="text-gray-700">{registro.hora}</TableCell>
+                          <TableCell className="text-gray-700">{registro.fechaSolo || registro.fecha?.split('T')[0] || "Sin fecha"}</TableCell>
+                          <TableCell className="text-gray-700">{registro.hora || "Sin hora"}</TableCell>
                           <TableCell>
                             <a
                               href={`https://www.google.com/maps?q=${registro.latitud},${registro.longitud}`}
