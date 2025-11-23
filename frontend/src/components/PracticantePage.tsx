@@ -78,12 +78,31 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
     // Simular petición
     setTimeout(() => {
       const ahora = new Date();
+
+      const consultoriosGuardados = localStorage.getItem("consultorios");
+      const consultorioActivoId = localStorage.getItem("consultorioActivoId");
+      let consultorioNombre: string | null = null;
+
+      if (consultoriosGuardados && consultorioActivoId) {
+        try {
+          const lista = JSON.parse(consultoriosGuardados) as { id: number; nombre: string }[];
+          const encontrado = lista.find((c) => String(c.id) === consultorioActivoId);
+          if (encontrado) {
+            consultorioNombre = encontrado.nombre;
+          }
+        } catch {
+          consultorioNombre = null;
+        }
+      }
+
       const registro = {
         id: Date.now(),
         practicante_id: user.id,
         practicante_nombre: user.nombre,
         especialidad: user.especialidad,
         tratamiento,
+        consultorioId: consultorioActivoId ? Number(consultorioActivoId) : null,
+        consultorioNombre,
         fecha: ahora.toLocaleDateString("es-ES"),
         hora: ahora.toLocaleTimeString("es-ES"),
         latitud: location?.lat || 0,

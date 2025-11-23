@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { LogOut, CheckCircle2, Activity, Stethoscope, QrCode } from "lucide-react";
+import { LogOut, CheckCircle2, Activity, QrCode, RefreshCw } from "lucide-react";
 import { toast } from "./ui/sonner";
 import { Badge } from "./ui/badge";
 
@@ -18,6 +18,44 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
   const [locationError, setLocationError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showQR, setShowQR] = useState(false);
+
+const obtenerUbicacion = () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLocationError(false);
+      },
+      (error) => {
+        console.warn("No se pudo obtener la ubicación:", error.message || "Permiso denegado");
+        setLocationError(true);
+        // Usar ubicación por defecto si falla
+        setLocation({
+          lat: 0,
+          lng: 0,
+        });
+      },
+      {
+        timeout: 10000,
+        enableHighAccuracy: false,
+      }
+    );
+  } else {
+    setLocationError(true);
+    setLocation({
+      lat: 0,
+      lng: 0,
+    });
+  }
+};
+
+const handleSincronizarDatos = () => {
+  obtenerUbicacion();
+  toast.success("Datos sincronizados correctamente");
+};
 
   const tratamientos = [
     "Rehabilitación Traumatológica",
@@ -34,39 +72,10 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
     "Crioterapia",
   ];
 
-  useEffect(() => {
-    // Obtener geolocalización al cargar
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setLocationError(false);
-        },
-        (error) => {
-          console.warn("No se pudo obtener la ubicación:", error.message || "Permiso denegado");
-          setLocationError(true);
-          // Usar ubicación por defecto si falla
-          setLocation({
-            lat: 0,
-            lng: 0,
-          });
-        },
-        {
-          timeout: 10000,
-          enableHighAccuracy: false,
-        }
-      );
-    } else {
-      setLocationError(true);
-      setLocation({
-        lat: 0,
-        lng: 0,
-      });
-    }
+    useEffect(() => {
+    obtenerUbicacion();
   }, []);
+
 
   const handleRegistrar = () => {
     if (!tratamiento) {
@@ -79,12 +88,31 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
     // Simular petición
     setTimeout(() => {
       const ahora = new Date();
+
+      const consultoriosGuardados = localStorage.getItem("consultorios");
+      const consultorioActivoId = localStorage.getItem("consultorioActivoId");
+      let consultorioNombre: string | null = null;
+
+      if (consultoriosGuardados && consultorioActivoId) {
+        try {
+          const lista = JSON.parse(consultoriosGuardados) as { id: number; nombre: string }[];
+          const encontrado = lista.find((c) => String(c.id) === consultorioActivoId);
+          if (encontrado) {
+            consultorioNombre = encontrado.nombre;
+          }
+        } catch {
+          consultorioNombre = null;
+        }
+      }
+
       const registro = {
         id: Date.now(),
         kinesiologo_id: user.id,
         kinesiologo_nombre: user.nombre,
         especialidad: user.especialidad,
         tratamiento,
+        consultorioId: consultorioActivoId ? Number(consultorioActivoId) : null,
+        consultorioNombre,
         fecha: ahora.toLocaleDateString("es-ES"),
         hora: ahora.toLocaleTimeString("es-ES"),
         latitud: location?.lat || 0,
@@ -122,7 +150,7 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                <Stethoscope className="h-7 w-7 text-white" />
+                <img src="/src/assets/icono-kine.png" alt="Ícono de Kinesiología" className="h-9 w-9" />
               </div>
               <div>
                 <h1 className="text-gray-900 flex items-center gap-2">
@@ -135,15 +163,27 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowQR(!showQR)} 
-                className="border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+              <Button
+                variant="outline"
+                onClick={handleSincronizarDatos}
+                className="h-10 px-4 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sincronizar Datos
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowQR(!showQR)}
+                className="h-10 px-4 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
               >
                 <QrCode className="mr-2 h-4 w-4" />
                 {showQR ? "Ocultar QR" : "Mostrar QR"}
               </Button>
-              <Button variant="outline" onClick={onLogout} className="border-gray-300">
+              <Button
+                variant="outline"
+                onClick={onLogout}
+                className="h-10 px-4 border-gray-300 hover:bg-gray-50"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Cerrar Sesión
               </Button>

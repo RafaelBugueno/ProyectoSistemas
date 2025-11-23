@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
-import { LogOut, Activity, MapPin, FileText, Calendar, Shield, Stethoscope, Filter, X, Search } from "lucide-react";
+import { LogOut, Activity, MapPin, FileText, Calendar, Shield, Stethoscope, Filter, X, Search, Building2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -13,26 +13,85 @@ interface AdminPageProps {
   onLogout: () => void;
 }
 
+interface Consultorio {
+  id: number;
+  nombre: string;
+  direccion?: string;
+}
+
 export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [registros, setRegistros] = useState<any[]>([]);
   const [filtroKinesiologo, setFiltroKinesiologo] = useState<string>("todos");
   const [filtroTratamiento, setFiltroTratamiento] = useState<string>("todos");
+  const [filtroConsultorio, setFiltroConsultorio] = useState<string>("todos");
   const [filtroFechaInicio, setFiltroFechaInicio] = useState<string>("");
   const [filtroFechaFin, setFiltroFechaFin] = useState<string>("");
   const [filtroBusqueda, setFiltroBusqueda] = useState<string>("");
+
+  const [consultorios, setConsultorios] = useState<Consultorio[]>([]);
+  const [consultorioActivoId, setConsultorioActivoId] = useState<number | null>(null);
+  const [nuevoConsultorioNombre, setNuevoConsultorioNombre] = useState<string>("");
+  const [nuevoConsultorioDireccion, setNuevoConsultorioDireccion] = useState<string>("");
 
   const cargarRegistros = () => {
     const data = JSON.parse(localStorage.getItem("registros") || "[]");
     setRegistros(data.reverse()); // Mostrar los más recientes primero
   };
 
+  const cargarConsultorios = () => {
+    const consultoriosGuardados = localStorage.getItem("consultorios");
+    let consultoriosIniciales: Consultorio[] = [];
+
+    if (consultoriosGuardados) {
+      try {
+        consultoriosIniciales = JSON.parse(consultoriosGuardados);
+      } catch (error) {
+        consultoriosIniciales = [];
+      }
+    }
+
+    if (consultoriosIniciales.length === 0) {
+      consultoriosIniciales = [
+        {
+          id: 1,
+          nombre: "Consultorio Principal",
+        },
+      ];
+      localStorage.setItem("consultorios", JSON.stringify(consultoriosIniciales));
+    }
+
+    setConsultorios(consultoriosIniciales);
+
+    const consultorioActivoGuardado = localStorage.getItem("consultorioActivoId");
+    let idActivo: number | null = null;
+
+    if (consultorioActivoGuardado) {
+      const parsed = Number(consultorioActivoGuardado);
+      idActivo = Number.isNaN(parsed) ? null : parsed;
+    }
+
+    if (idActivo === null && consultoriosIniciales[0]) {
+      idActivo = consultoriosIniciales[0].id;
+    }
+
+    if (idActivo !== null) {
+      setConsultorioActivoId(idActivo);
+      localStorage.setItem("consultorioActivoId", String(idActivo));
+    } else {
+      setConsultorioActivoId(null);
+      localStorage.removeItem("consultorioActivoId");
+    }
+  };
+
   useEffect(() => {
     cargarRegistros();
+    cargarConsultorios();
   }, []);
 
   const limpiarFiltros = () => {
     setFiltroKinesiologo("todos");
     setFiltroTratamiento("todos");
+    setFiltroConsultorio("todos");
     setFiltroFechaInicio("");
     setFiltroFechaFin("");
     setFiltroBusqueda("");
@@ -42,6 +101,69 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     // Los filtros se aplican automáticamente gracias a useMemo
     // Esta función existe para dar feedback al usuario
   };
+
+  const actualizarConsultoriosEnStorage = (lista: Consultorio[]) => {
+    setConsultorios(lista);
+    localStorage.setItem("consultorios", JSON.stringify(lista));
+  };
+
+  const manejarCambioConsultorioActivo = (id: number | null) => {
+    setConsultorioActivoId(id);
+    if (id === null) {
+      localStorage.removeItem("consultorioActivoId");
+    } else {
+      localStorage.setItem("consultorioActivoId", String(id));
+    }
+  };
+
+  const handleAgregarConsultorio = () => {
+    const nombre = nuevoConsultorioNombre.trim();
+    const direccion = nuevoConsultorioDireccion.trim();
+
+    if (!nombre) {
+      return;
+    }
+
+    const nuevo: Consultorio = {
+      id: Date.now(),
+      nombre,
+      ...(direccion ? { direccion } : {}),
+    };
+
+    const actualizados = [...consultorios, nuevo];
+    actualizarConsultoriosEnStorage(actualizados);
+
+    if (!consultorioActivoId) {
+      manejarCambioConsultorioActivo(nuevo.id);
+    }
+
+    setNuevoConsultorioNombre("");
+    setNuevoConsultorioDireccion("");
+  };
+
+  const handleEliminarConsultorio = (id: number) => {
+    const actualizados = consultorios.filter((c) => c.id !== id);
+    actualizarConsultoriosEnStorage(actualizados);
+
+    if (consultorioActivoId === id) {
+      manejarCambioConsultorioActivo(actualizados[0]?.id ?? null);
+    }
+  };
+
+  const handleRestablecerConsultorios = () => {
+    const porDefecto: Consultorio[] = [
+      { id: 1, nombre: "Consultorio Principal" },
+    ];
+    actualizarConsultoriosEnStorage(porDefecto);
+    manejarCambioConsultorioActivo(porDefecto[0].id);
+    setNuevoConsultorioNombre("");
+    setNuevoConsultorioDireccion("");
+  };
+
+  const consultorioActivo = useMemo(
+    () => consultorios.find((c) => c.id === consultorioActivoId) || null,
+    [consultorios, consultorioActivoId]
+  );
 
   // Obtener listas únicas para filtros
   const kinesiologosUnicos = useMemo(() => {
@@ -53,6 +175,24 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     const tratamientos = new Set(registros.map((r) => r.tratamiento || r.actividad));
     return Array.from(tratamientos).sort();
   }, [registros]);
+
+  const consultoriosUnicos = useMemo(() => {
+    const nombres = new Set<string>();
+
+    registros.forEach((r) => {
+      if (r.consultorioNombre) {
+        nombres.add(r.consultorioNombre);
+      }
+    });
+
+    consultorios.forEach((c) => {
+      if (c.nombre) {
+        nombres.add(c.nombre);
+      }
+    });
+
+    return Array.from(nombres).sort();
+  }, [registros, consultorios]);
 
   // Función para convertir fecha en formato DD/MM/YYYY a objeto Date
   const parsearFecha = (fechaStr: string): Date => {
@@ -69,6 +209,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     return registros.filter((registro) => {
       const nombreKinesiologo = registro.kinesiologo_nombre || registro.practicante_nombre;
       const tratamiento = registro.tratamiento || registro.actividad;
+      const nombreConsultorio = registro.consultorioNombre || "";
       
       // Filtro por kinesiólogo
       if (filtroKinesiologo !== "todos" && nombreKinesiologo !== filtroKinesiologo) {
@@ -79,8 +220,13 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       if (filtroTratamiento !== "todos" && tratamiento !== filtroTratamiento) {
         return false;
       }
-      
-      // Filtro por rango de fechas
+
+      // Filtro por consultorio
+      if (filtroConsultorio !== "todos" && nombreConsultorio !== filtroConsultorio) {
+        return false;
+      }
+
+// Filtro por rango de fechas
       if (filtroFechaInicio || filtroFechaFin) {
         const fechaRegistro = parsearFecha(registro.fecha);
         
@@ -109,14 +255,15 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           tratamiento.toLowerCase().includes(busqueda) ||
           (registro.especialidad || "").toLowerCase().includes(busqueda) ||
           registro.fecha.toLowerCase().includes(busqueda) ||
-          registro.hora.toLowerCase().includes(busqueda);
+          registro.hora.toLowerCase().includes(busqueda) ||
+          nombreConsultorio.toLowerCase().includes(busqueda);
         
         if (!coincide) return false;
       }
       
       return true;
     });
-  }, [registros, filtroKinesiologo, filtroTratamiento, filtroFechaInicio, filtroFechaFin, filtroBusqueda]);
+  }, [registros, filtroKinesiologo, filtroTratamiento, filtroConsultorio, filtroFechaInicio, filtroFechaFin, filtroBusqueda]);
 
   // Estadísticas basadas en registros filtrados
   const totalSesiones = registrosFiltrados.length;
@@ -128,6 +275,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const hayFiltrosActivos = 
     filtroKinesiologo !== "todos" || 
     filtroTratamiento !== "todos" || 
+    filtroConsultorio !== "todos" ||
     filtroFechaInicio !== "" || 
     filtroFechaFin !== "" ||
     filtroBusqueda !== "";
@@ -156,6 +304,143 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
             </Button>
           </div>
         </div>
+
+        {/* Gestión de Consultorios */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-cyan-100 flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-cyan-700" />
+              </div>
+              <div>
+                <CardTitle className="text-sm text-gray-900">Gestión de consultorios</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Define el consultorio actual y administra las sedes disponibles.
+                </CardDescription>
+              </div>
+            </div>
+            {consultorioActivo && (
+              <div className="text-sm text-right space-y-1">
+                <p className="text-gray-500">Consultorio actual</p>
+                <p className="font-medium text-gray-900">
+                  {consultorioActivo.nombre}
+                </p>
+                {consultorioActivo.direccion && (
+                  <p className="text-xs text-gray-500">
+                    {consultorioActivo.direccion}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <div className="space-y-2">
+                <Label htmlFor="consultorioActivo" className="text-gray-700">
+                  Consultorio activo
+                </Label>
+                <Select
+                  value={consultorioActivoId ? String(consultorioActivoId) : ""}
+                  onValueChange={(value) => {
+                    if (!value) {
+                      manejarCambioConsultorioActivo(null);
+                      return;
+                    }
+                    const id = Number(value);
+                    manejarCambioConsultorioActivo(Number.isNaN(id) ? null : id);
+                  }}
+                >
+                  <SelectTrigger id="consultorioActivo" className="border-gray-300">
+                    <SelectValue placeholder="Selecciona un consultorio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consultorios.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        No hay consultorios configurados
+                      </SelectItem>
+                    )}
+                    {consultorios.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Este consultorio se utilizará al registrar nuevas sesiones en el sistema.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-700">Registrar nuevo consultorio</Label>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Input
+                    placeholder="Nombre del consultorio"
+                    value={nuevoConsultorioNombre}
+                    onChange={(e) => setNuevoConsultorioNombre(e.target.value)}
+                    className="border-gray-300"
+                  />
+                  <Input
+                    placeholder="Dirección (opcional)"
+                    value={nuevoConsultorioDireccion}
+                    onChange={(e) => setNuevoConsultorioDireccion(e.target.value)}
+                    className="border-gray-300"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={handleAgregarConsultorio}>
+                    Agregar consultorio
+                  </Button>
+                  {consultorios.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleRestablecerConsultorios}
+                      className="border-gray-300"
+                    >
+                      Restablecer consultorios
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {consultorios.length > 0 && (
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-500 mb-2">
+                  Consultorios registrados
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {consultorios.map((c) => (
+                    <Badge
+                      key={c.id}
+                      variant={consultorioActivoId === c.id ? "default" : "outline"}
+                      className={
+                        consultorioActivoId === c.id
+                          ? "bg-cyan-600 text-white"
+                          : "border-gray-300 text-gray-700"
+                      }
+                    >
+                      {c.nombre}
+                      {consultorioActivoId === c.id && (
+                        <span className="ml-2 text-[10px] uppercase tracking-wide">
+                          Activo
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="ml-2 text-[10px] underline"
+                        onClick={() => handleEliminarConsultorio(c.id)}
+                      >
+                        Quitar
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Estadísticas */}
         <div className="grid gap-6 md:grid-cols-4 mb-6">
@@ -246,7 +531,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
             </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
               <div className="space-y-2">
                 <Label htmlFor="busqueda" className="text-gray-700">Búsqueda General</Label>
                 <Input
@@ -286,6 +571,23 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                     {tratamientosUnicos.map((tratamiento) => (
                       <SelectItem key={tratamiento} value={tratamiento}>
                         {tratamiento}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="consultorio" className="text-gray-700">Consultorio</Label>
+                <Select value={filtroConsultorio} onValueChange={setFiltroConsultorio}>
+                  <SelectTrigger id="consultorio" className="border-gray-300">
+                    <SelectValue placeholder="Todos los consultorios" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los consultorios</SelectItem>
+                    {consultoriosUnicos.map((nombre) => (
+                      <SelectItem key={nombre} value={nombre}>
+                        {nombre}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -374,6 +676,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                         <TableHead className="text-gray-700">Profesional</TableHead>
                         <TableHead className="text-gray-700">Especialidad</TableHead>
                         <TableHead className="text-gray-700">Tratamiento</TableHead>
+                        <TableHead className="text-gray-700">Consultorio</TableHead>
                         <TableHead className="text-gray-700">Fecha</TableHead>
                         <TableHead className="text-gray-700">Hora</TableHead>
                         <TableHead className="text-gray-700">Ubicación</TableHead>
@@ -401,6 +704,9 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                             <Badge className="bg-blue-600">
                               {registro.tratamiento || registro.actividad}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-gray-700">
+                            {registro.consultorioNombre || "No asignado"}
                           </TableCell>
                           <TableCell className="text-gray-700">{registro.fecha}</TableCell>
                           <TableCell className="text-gray-700">{registro.hora}</TableCell>
