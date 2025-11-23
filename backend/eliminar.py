@@ -1,13 +1,29 @@
 from generalSQL import DELETE
-HOST="IP_HOST"
-DATABASE="NOMBRE_BASE_DE_DATOS"
-USER="NOMBRE_USUARIO"
-PASSWORD="CONTRASEÑA"
-PORT=5432
+
+def eliminarAtencion(id: int):
+    query = f"""
+    DELETE FROM atencion
+    WHERE id = {id};
+    """
+    return DELETE(query)
 
 def eliminarPracticante(nombre: str):
-    query = f”””
-    DELETE FROM Practicante
-    WHERE Nombre = {nombre};
-    “””
+    query = f"""
+    DELETE FROM practicante
+    WHERE nombre = '{nombre}';
+    """
+    return DELETE(query)
+
+def eliminarConsultorio(nombre: str):
+    query = f"""
+    DELETE FROM consultorio
+    WHERE nombre = '{nombre}';
+    """
+    return DELETE(query)
+
+def eliminarTipoAtencion(nombre: str):
+    query = f"""
+    DELETE FROM tipo_atencion
+    WHERE nombre = '{nombre}';
+    """
     return DELETE(query)
