@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware 
-import Agregar as agregar
-import Seleccionar as seleccionar
-import Eliminar as eliminar
-import Actualizar as actualizar
+import agregar as agregar
+import seleccionar as seleccionar
+import eliminar as eliminar
+import actualizar as actualizar
 from utils import auth
 from pydantic import BaseModel
 from typing import Optional
