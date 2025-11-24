@@ -52,6 +52,12 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [nuevoPracticantePassword, setNuevoPracticantePassword] = useState<string>("");
   const [nuevoPracticanteConsultorio, setNuevoPracticanteConsultorio] = useState<string>("");
 
+  // Estados para diálogos de confirmación
+  const [showConfirmCrearPracticante, setShowConfirmCrearPracticante] = useState(false);
+  const [showConfirmAgregarConsultorio, setShowConfirmAgregarConsultorio] = useState(false);
+  const [showConfirmCambiarEstado, setShowConfirmCambiarEstado] = useState(false);
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+
   const cargarRegistros = async () => {
     console.log("🔄 AdminPage: Cargando registros...");
     try {
@@ -206,11 +212,20 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   const handleAgregarConsultorio = () => {
     const nombre = nuevoConsultorioNombre.trim();
-    const direccion = nuevoConsultorioDireccion.trim();
 
     if (!nombre) {
+      toast.error("El nombre del consultorio es requerido");
       return;
     }
+
+    setShowConfirmAgregarConsultorio(true);
+  };
+
+  const confirmarAgregarConsultorio = () => {
+    setShowConfirmAgregarConsultorio(false);
+    
+    const nombre = nuevoConsultorioNombre.trim();
+    const direccion = nuevoConsultorioDireccion.trim();
 
     const nuevo: Consultorio = {
       id: Date.now(),
@@ -227,6 +242,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
     setNuevoConsultorioNombre("");
     setNuevoConsultorioDireccion("");
+    toast.success("Consultorio agregado exitosamente");
   };
 
   const handleEliminarConsultorio = (id: number) => {
@@ -254,7 +270,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   );
 
   // Funciones de gestión de practicantes
-  const handleAgregarPracticante = async () => {
+  const handleAgregarPracticante = () => {
     const nombre = nuevoPracticanteNombre.trim();
     const rut = nuevoPracticanteRut.trim();
     const password = nuevoPracticantePassword.trim();
@@ -264,6 +280,17 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       toast.error("Todos los campos son requeridos");
       return;
     }
+
+    setShowConfirmCrearPracticante(true);
+  };
+
+  const confirmarCrearPracticante = async () => {
+    setShowConfirmCrearPracticante(false);
+    
+    const nombre = nuevoPracticanteNombre.trim();
+    const rut = nuevoPracticanteRut.trim();
+    const password = nuevoPracticantePassword.trim();
+    const consultorio = nuevoPracticanteConsultorio;
 
     try {
       await apiRequest("/api/practicantes", {
@@ -282,14 +309,23 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
   };
 
-  const handleCambiarEstadoPracticante = async () => {
+  const handleCambiarEstadoPracticante = () => {
     if (!practicanteSeleccionado || !practicanteActual) {
       toast.error("Selecciona un practicante primero");
       return;
     }
 
+    setShowConfirmCambiarEstado(true);
+  };
+
+  const confirmarCambiarEstadoPracticante = async () => {
+    setShowConfirmCambiarEstado(false);
+
+    if (!practicanteSeleccionado || !practicanteActual) {
+      return;
+    }
+
     const esActivo = practicanteActual.estado === "activo";
-    const nuevoEstado = esActivo ? "inactivo" : "activo";
 
     try {
       if (esActivo) {
@@ -568,7 +604,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                 <p className="text-gray-600">{user.nombre}</p>
               </div>
             </div>
-            <Button variant="outline" onClick={onLogout} className="border-gray-300">
+            <Button variant="outline" onClick={() => setShowConfirmLogout(true)} className="border-gray-300">
               <LogOut className="mr-2 h-4 w-4" />
               Cerrar Sesión
             </Button>
@@ -1211,6 +1247,87 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Diálogo: Crear Practicante */}
+      <div 
+        className={showConfirmCrearPracticante ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmCrearPracticante(false)}
+      />
+      <div className={showConfirmCrearPracticante ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Crear nuevo practicante?</div>
+        <div className="confirm-message">
+          Estás a punto de crear el practicante <strong>{nuevoPracticanteNombre}</strong> con RUT <strong>{nuevoPracticanteRut}</strong> asignado al consultorio <strong>{nuevoPracticanteConsultorio}</strong>.
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmCrearPracticante(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarCrearPracticante}>Crear practicante</button>
+        </div>
+      </div>
+
+      {/* Diálogo: Agregar Consultorio */}
+      <div 
+        className={showConfirmAgregarConsultorio ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmAgregarConsultorio(false)}
+      />
+      <div className={showConfirmAgregarConsultorio ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Agregar nuevo consultorio?</div>
+        <div className="confirm-message">
+          Estás a punto de agregar el consultorio <strong>{nuevoConsultorioNombre}</strong>
+          {nuevoConsultorioDireccion && (
+            <>
+              {' '}con dirección <strong>{nuevoConsultorioDireccion}</strong>
+            </>
+          )}.
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmAgregarConsultorio(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarAgregarConsultorio}>Agregar consultorio</button>
+        </div>
+      </div>
+
+      {/* Diálogo: Cambiar Estado Practicante */}
+      <div 
+        className={showConfirmCambiarEstado ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmCambiarEstado(false)}
+      />
+      <div className={showConfirmCambiarEstado ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">
+          {practicanteActual?.estado === "activo" ? "¿Desactivar practicante?" : "¿Activar practicante?"}
+        </div>
+        <div className="confirm-message">
+          {practicanteActual?.estado === "activo" ? (
+            <>
+              Estás a punto de desactivar a <strong>{practicanteSeleccionado}</strong>. El practicante no podrá iniciar sesión hasta que sea reactivado.
+            </>
+          ) : (
+            <>
+              Estás a punto de activar a <strong>{practicanteSeleccionado}</strong>. El practicante podrá iniciar sesión nuevamente.
+            </>
+          )}
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmCambiarEstado(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarCambiarEstadoPracticante}>
+            {practicanteActual?.estado === "activo" ? "Desactivar" : "Activar"}
+          </button>
+        </div>
+      </div>
+
+      {/* Diálogo: Cerrar Sesión */}
+      <div 
+        className={showConfirmLogout ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmLogout(false)}
+      />
+      <div className={showConfirmLogout ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Cerrar sesión?</div>
+        <div className="confirm-message">
+          ¿Estás seguro que deseas salir del panel de administración?
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmLogout(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={onLogout}>Cerrar sesión</button>
+        </div>
       </div>
     </div>
   );
