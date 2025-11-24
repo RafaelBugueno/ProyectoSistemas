@@ -23,6 +23,7 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [showQR, setShowQR] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
 const obtenerUbicacion = () => {
   if (navigator.geolocation) {
@@ -143,7 +144,7 @@ const handleSincronizarDatos = async () => {
   }, []);
 
 
-  const handleRegistrar = async () => {
+  const handleRegistrar = () => {
     if (!tratamiento) {
       toast.error("Por favor selecciona un tipo de atención");
       return;
@@ -154,6 +155,11 @@ const handleSincronizarDatos = async () => {
       return;
     }
 
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmarRegistro = async () => {
+    setShowConfirmDialog(false);
     setLoading(true);
 
     try {
@@ -443,6 +449,38 @@ const handleSincronizarDatos = async () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Overlay de confirmación */}
+      <div 
+        className={showConfirmDialog ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmDialog(false)}
+      />
+
+      {/* Diálogo de confirmación */}
+      <div className={showConfirmDialog ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">
+          ¿Confirmar registro de sesión?
+        </div>
+        <div className="confirm-message">
+          Estás a punto de registrar una sesión de <strong>{tratamiento}</strong> en <strong>{consultorioSeleccionado}</strong>.
+          <br /><br />
+          Esta acción quedará registrada en el sistema y será visible para el administrador.
+        </div>
+        <div className="confirm-buttons">
+          <button 
+            className="confirm-btn-cancel"
+            onClick={() => setShowConfirmDialog(false)}
+          >
+            Cancelar
+          </button>
+          <button 
+            className="confirm-btn-confirm"
+            onClick={handleConfirmarRegistro}
+          >
+            Confirmar registro
+          </button>
         </div>
       </div>
     </div>

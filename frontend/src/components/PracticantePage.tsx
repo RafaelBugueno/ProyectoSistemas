@@ -6,6 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { LogOut, CheckCircle2, Activity, Stethoscope } from "lucide-react";
 import { toast } from "./ui/sonner";
 import { Badge } from "./ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface PracticantePageProps {
   user: any;
@@ -17,6 +27,7 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const tratamientos = [
     "Rehabilitación Traumatológica",
@@ -73,6 +84,12 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
       return;
     }
 
+    // Mostrar diálogo de confirmación
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmarRegistro = () => {
+    setShowConfirmDialog(false);
     setLoading(true);
 
     // Simular petición
@@ -243,6 +260,30 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
           </Card>
         </div>
       </div>
+
+      {/* Diálogo de confirmación */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar registro de atención</AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Estás seguro de que deseas registrar esta sesión de tratamiento?
+              <div className="mt-4 space-y-2 text-sm">
+                <p><strong>Tratamiento:</strong> {tratamiento}</p>
+                <p><strong>Profesional:</strong> {user.nombre}</p>
+                <p><strong>Fecha:</strong> {new Date().toLocaleDateString('es-ES')}</p>
+                <p><strong>Hora:</strong> {new Date().toLocaleTimeString('es-ES')}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmarRegistro}>
+              Confirmar registro
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
