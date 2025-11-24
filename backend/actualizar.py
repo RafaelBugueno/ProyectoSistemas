@@ -24,4 +24,11 @@ def actualizarPasswordAdministrador(nombre: str, nuevaPassword: str):
     """
     return UPDATE(query)
 
+def actualizarEstadoPracticante(nombre: str, estado: str):
+    query = f"""
+    UPDATE practicante
+    SET estado = '{estado}'
+    WHERE nombre = '{nombre}';
+    """
+    return UPDATE(query)
 

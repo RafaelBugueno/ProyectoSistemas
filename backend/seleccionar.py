@@ -40,7 +40,7 @@ def seleccionarConsultorio():
     return SELECT(query)
 
 def seleccionarPracticantes():
-    query = "SELECT nombre, rut, consultorio FROM practicante ORDER BY nombre;"
+    query = "SELECT nombre, rut, consultorio, estado FROM practicante ORDER BY nombre;"
     return SELECT(query)
 
 def seleccionarPracticantePorNombre(nombre: str):

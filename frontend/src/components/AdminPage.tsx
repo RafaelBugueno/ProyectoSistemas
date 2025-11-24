@@ -24,6 +24,13 @@ interface Consultorio {
   direccion?: string;
 }
 
+interface Practicante {
+  nombre: string;
+  rut: string;
+  consultorio: string;
+  estado: string;
+}
+
 export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [registros, setRegistros] = useState<any[]>([]);
   const [filtroKinesiologo, setFiltroKinesiologo] = useState<string>("todos");
@@ -37,6 +44,13 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [consultorioActivoId, setConsultorioActivoId] = useState<number | null>(null);
   const [nuevoConsultorioNombre, setNuevoConsultorioNombre] = useState<string>("");
   const [nuevoConsultorioDireccion, setNuevoConsultorioDireccion] = useState<string>("");
+
+  const [practicantes, setPracticantes] = useState<Practicante[]>([]);
+  const [practicanteSeleccionado, setPracticanteSeleccionado] = useState<string>("");
+  const [nuevoPracticanteNombre, setNuevoPracticanteNombre] = useState<string>("");
+  const [nuevoPracticanteRut, setNuevoPracticanteRut] = useState<string>("");
+  const [nuevoPracticantePassword, setNuevoPracticantePassword] = useState<string>("");
+  const [nuevoPracticanteConsultorio, setNuevoPracticanteConsultorio] = useState<string>("");
 
   const cargarRegistros = async () => {
     console.log("🔄 AdminPage: Cargando registros...");
@@ -130,13 +144,29 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
   };
 
+  const cargarPracticantes = async () => {
+    console.log("👨‍⚕️ AdminPage: Cargando practicantes...");
+    try {
+      const response = await apiRequest("/api/practicantes");
+      console.log("🏥 AdminPage: Respuesta de practicantes:", response);
+      if (response.status === "ok") {
+        console.log("✅ AdminPage: Practicantes cargados desde backend:", response.data?.length || 0);
+        console.log("📊 AdminPage: Primer practicante (ejemplo):", response.data?.[0]);
+        setPracticantes(response.data || []);
+      }
+    } catch (error) {
+      console.warn("⚠️ AdminPage: Error al cargar practicantes desde backend:", error);
+      setPracticantes([]);
+    }
+  };
+
   useEffect(() => {
     console.log("🚀 AdminPage: Componente montado, iniciando carga de datos...");
     console.log("👤 Usuario actual:", user);
     
     const inicializar = async () => {
       try {
-        await Promise.all([cargarRegistros(), cargarConsultorios()]);
+        await Promise.all([cargarRegistros(), cargarConsultorios(), cargarPracticantes()]);
         console.log("✅ AdminPage: Datos iniciales cargados correctamente");
       } catch (error) {
         console.error("❌ AdminPage: Error al inicializar:", error);
@@ -221,6 +251,89 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const consultorioActivo = useMemo(
     () => consultorios.find((c) => c.id === consultorioActivoId) || null,
     [consultorios, consultorioActivoId]
+  );
+
+  // Funciones de gestión de practicantes
+  const handleAgregarPracticante = async () => {
+    const nombre = nuevoPracticanteNombre.trim();
+    const rut = nuevoPracticanteRut.trim();
+    const password = nuevoPracticantePassword.trim();
+    const consultorio = nuevoPracticanteConsultorio;
+
+    if (!nombre || !rut || !password || !consultorio) {
+      toast.error("Todos los campos son requeridos");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/practicantes", {
+        method: "POST",
+        body: JSON.stringify({ nombre, rut, password, consultorio }),
+      });
+      
+      toast.success("Practicante creado exitosamente");
+      setNuevoPracticanteNombre("");
+      setNuevoPracticanteRut("");
+      setNuevoPracticantePassword("");
+      setNuevoPracticanteConsultorio("");
+      await cargarPracticantes();
+    } catch (error: any) {
+      toast.error(error.message || "Error al crear practicante");
+    }
+  };
+
+  const handleCambiarEstadoPracticante = async () => {
+    if (!practicanteSeleccionado || !practicanteActual) {
+      toast.error("Selecciona un practicante primero");
+      return;
+    }
+
+    const esActivo = practicanteActual.estado === "activo";
+    const nuevoEstado = esActivo ? "inactivo" : "activo";
+
+    try {
+      if (esActivo) {
+        // Desactivar
+        await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteSeleccionado)}`, {
+          method: "DELETE",
+        });
+        toast.success("Practicante desactivado exitosamente");
+      } else {
+        // Activar
+        await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteSeleccionado)}/activar`, {
+          method: "PUT",
+        });
+        toast.success("Practicante activado exitosamente");
+      }
+      
+      await cargarPracticantes();
+    } catch (error: any) {
+      toast.error(error.message || `Error al ${esActivo ? 'desactivar' : 'activar'} practicante`);
+    }
+  };
+
+  const handleActualizarConsultorioPracticante = async (nuevoConsultorio: string) => {
+    if (!practicanteSeleccionado) {
+      toast.error("Selecciona un practicante primero");
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteSeleccionado)}`, {
+        method: "PUT",
+        body: JSON.stringify({ consultorio: nuevoConsultorio }),
+      });
+      
+      toast.success("Consultorio actualizado exitosamente");
+      await cargarPracticantes();
+    } catch (error: any) {
+      toast.error(error.message || "Error al actualizar consultorio");
+    }
+  };
+
+  const practicanteActual = useMemo(
+    () => practicantes.find((p) => p.nombre === practicanteSeleccionado) || null,
+    [practicantes, practicanteSeleccionado]
   );
 
   // Obtener listas únicas para filtros
@@ -567,32 +680,225 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                 <p className="text-xs text-gray-500 mb-2">
                   Consultorios registrados
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {consultorios.map((c) => (
-                    <Badge
-                      key={c.id}
-                      variant={consultorioActivoId === c.id ? "default" : "outline"}
+                <div className="overflow-x-auto">
+                  <div className="flex gap-2 pb-2 min-w-max">
+                    {consultorios.map((c) => (
+                      <Badge
+                        key={c.id}
+                        variant={consultorioActivoId === c.id ? "default" : "outline"}
+                        className={
+                          consultorioActivoId === c.id
+                            ? "bg-cyan-600 text-white whitespace-nowrap"
+                            : "border-gray-300 text-gray-700 whitespace-nowrap"
+                        }
+                      >
+                        {c.nombre}
+                        {consultorioActivoId === c.id && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide">
+                            Activo
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="ml-2 text-[10px] underline"
+                          onClick={() => handleEliminarConsultorio(c.id)}
+                        >
+                          Quitar
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gestión de Practicantes */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                <Stethoscope className="h-5 w-5 text-blue-700" />
+              </div>
+              <div>
+                <CardTitle className="text-sm text-gray-900">Gestión de practicantes</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Administra los kinesiólogos y sus consultorios asignados.
+                </CardDescription>
+              </div>
+            </div>
+            {practicanteActual && (
+              <div className="text-sm text-right space-y-1">
+                <div className="flex items-center justify-end gap-2">
+                  <p className="text-gray-700">
+                    <strong>{practicanteActual.nombre}</strong>
+                  </p>
+                  <Badge 
+                    className={
+                      practicanteActual.estado === "activo"
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-400 text-white"
+                    }
+                  >
+                    {practicanteActual.estado}
+                  </Badge>
+                </div>
+                <p className="text-xs text-gray-500">
+                  RUT: {practicanteActual.rut}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Consultorio: {practicanteActual.consultorio}
+                </p>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="practicanteSeleccionado" className="text-gray-700">
+                  Seleccionar practicante
+                </Label>
+                <Select
+                  value={practicanteSeleccionado}
+                  onValueChange={(value: string) => setPracticanteSeleccionado(value)}
+                >
+                  <SelectTrigger id="practicanteSeleccionado" className="border-gray-300">
+                    <SelectValue placeholder="Selecciona un practicante" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {practicantes.length === 0 && (
+                      <SelectItem value="none" disabled>
+                        No hay practicantes registrados
+                      </SelectItem>
+                    )}
+                    {practicantes.map((p) => (
+                      <SelectItem key={p.nombre} value={p.nombre}>
+                        {p.nombre} ({p.rut})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {practicanteSeleccionado && practicanteActual && (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleCambiarEstadoPracticante}
                       className={
-                        consultorioActivoId === c.id
-                          ? "bg-cyan-600 text-white"
-                          : "border-gray-300 text-gray-700"
+                        practicanteActual.estado === "activo"
+                          ? "btn-desactivar-practicante"
+                          : "btn-activar-practicante"
                       }
                     >
-                      {c.nombre}
-                      {consultorioActivoId === c.id && (
-                        <span className="ml-2 text-[10px] uppercase tracking-wide">
-                          Activo
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className="ml-2 text-[10px] underline"
-                        onClick={() => handleEliminarConsultorio(c.id)}
+                      {practicanteActual.estado === "activo" ? "Desactivar" : "Activar"} practicante
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-gray-700">Asignar consultorio</Label>
+                <Select
+                  value={practicanteActual?.consultorio || ""}
+                  onValueChange={(value: string) => handleActualizarConsultorioPracticante(value)}
+                  disabled={!practicanteSeleccionado}
+                >
+                  <SelectTrigger className="border-gray-300">
+                    <SelectValue placeholder="Selecciona un consultorio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consultorios.map((c) => (
+                      <SelectItem key={c.id} value={c.nombre}>
+                        {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500">
+                  Cambia el consultorio asignado al practicante seleccionado.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <Label className="text-gray-700 mb-3 block">Registrar nuevo practicante</Label>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input
+                  placeholder="Nombre completo"
+                  value={nuevoPracticanteNombre}
+                  onChange={(e) => setNuevoPracticanteNombre(e.target.value)}
+                  className="border-gray-300"
+                />
+                <Input
+                  placeholder="RUT (ej: 12345678-9)"
+                  value={nuevoPracticanteRut}
+                  onChange={(e) => setNuevoPracticanteRut(e.target.value)}
+                  className="border-gray-300"
+                />
+                <Input
+                  type="password"
+                  placeholder="Contraseña"
+                  value={nuevoPracticantePassword}
+                  onChange={(e) => setNuevoPracticantePassword(e.target.value)}
+                  className="border-gray-300"
+                />
+                <Select
+                  value={nuevoPracticanteConsultorio}
+                  onValueChange={(value: string) => setNuevoPracticanteConsultorio(value)}
+                >
+                  <SelectTrigger className="border-gray-300">
+                    <SelectValue placeholder="Consultorio asignado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {consultorios.map((c) => (
+                      <SelectItem key={c.id} value={c.nombre}>
+                        {c.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={handleAgregarPracticante}
+                className="mt-3 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Crear practicante
+              </Button>
+            </div>
+
+            {practicantes.length > 0 && (
+              <div className="pt-4 border-t border-gray-100 mt-6">
+                <p className="text-xs text-gray-500 mb-2">
+                  Practicantes registrados ({practicantes.length})
+                </p>
+                <div className="overflow-x-auto">
+                  <div className="flex gap-2 pb-2 min-w-max">
+                    {practicantes.map((p) => (
+                      <Badge
+                        key={p.nombre}
+                        variant={practicanteSeleccionado === p.nombre ? "default" : "outline"}
+                        className={
+                          practicanteSeleccionado === p.nombre
+                            ? "bg-blue-600 text-white whitespace-nowrap"
+                            : p.estado === "inactivo"
+                            ? "border-gray-300 text-gray-400 whitespace-nowrap opacity-60"
+                            : "border-gray-300 text-gray-700 whitespace-nowrap"
+                        }
                       >
-                        Quitar
-                      </button>
-                    </Badge>
-                  ))}
+                        {p.nombre} - {p.consultorio}
+                        {p.estado === "inactivo" && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide">
+                            Inactivo
+                          </span>
+                        )}
+                        {practicanteSeleccionado === p.nombre && p.estado === "activo" && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide">
+                            Seleccionado
+                          </span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

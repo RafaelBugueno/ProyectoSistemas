@@ -259,11 +259,31 @@ def crear_practicante(practicante: PracticanteCreate):
 
 @app.delete("/api/practicantes/{nombre}")
 def eliminar_practicante_endpoint(nombre: str):
-    """Elimina un practicante"""
-    resultado = eliminar.eliminarPracticante(nombre)
+    """Desactiva un practicante cambiando su estado a 'inactivo'"""
+    resultado = actualizar.actualizarEstadoPracticante(nombre, "inactivo")
     if resultado["status"] == "ok":
-        return {"status": "ok", "message": "Practicante eliminado exitosamente"}
-    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al eliminar practicante"))
+        return {"status": "ok", "message": "Practicante desactivado exitosamente"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al desactivar practicante"))
+
+@app.put("/api/practicantes/{nombre}/activar")
+def activar_practicante_endpoint(nombre: str):
+    """Activa un practicante cambiando su estado a 'activo'"""
+    resultado = actualizar.actualizarEstadoPracticante(nombre, "activo")
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Practicante activado exitosamente"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al activar practicante"))
+
+@app.put("/api/practicantes/{nombre}")
+def actualizar_practicante_endpoint(nombre: str, data: dict):
+    """Actualiza el consultorio de un practicante"""
+    consultorio = data.get("consultorio")
+    if not consultorio:
+        raise HTTPException(status_code=400, detail="Consultorio es requerido")
+    
+    resultado = actualizar.actualizarConsultorioPracticante(nombre, consultorio)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Practicante actualizado exitosamente"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al actualizar practicante"))
 
 
 # ============================================

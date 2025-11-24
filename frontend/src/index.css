@@ -141,6 +141,32 @@
   }
 }
 
+/* Botones de gestión de practicantes */
+.btn-desactivar-practicante {
+  color: white !important;
+  border: 2px solid #ea580c !important;
+  background: #ea580c !important;
+  transition: all 0.2s !important;
+}
+
+.btn-desactivar-practicante:hover:not(:disabled) {
+  background: #c2410c !important;
+  border-color: #c2410c !important;
+}
+
+.btn-activar-practicante {
+  color: white !important;
+  border: 2px solid #16a34a !important;
+  background: #16a34a !important;
+  transition: all 0.2s !important;
+}
+
+.btn-activar-practicante:hover:not(:disabled) {
+  background: #15803d !important;
+  border-color: #15803d !important;
+}
+
+
 @layer base {
   *, :after, :before, ::backdrop {
     box-sizing: border-box;
