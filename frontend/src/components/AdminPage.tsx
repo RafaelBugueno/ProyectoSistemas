@@ -475,9 +475,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
   // Estadísticas basadas en registros filtrados
   const totalSesiones = registrosFiltrados.length;
-  const kinesiologosActivosCount = new Set(
-    registrosFiltrados.map((r) => r.kinesiologo_id || r.practicante_id)
-  ).size;
+  const kinesiologosActivosCount = practicantes.filter(p => p.estado === "activo").length;
   const ultimaSesion = registrosFiltrados.length > 0 ? registrosFiltrados[0] : null;
 
   const hayFiltrosActivos = 
@@ -985,7 +983,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                 {ultimaSesion ? ultimaSesion.hora : "--:--"}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {ultimaSesion ? ultimaSesion.fecha : "Sin registros"}
+                {ultimaSesion ? (ultimaSesion.fechaSolo || ultimaSesion.fecha?.split('T')[0] || "Sin fecha") : "Sin registros"}
               </p>
             </CardContent>
           </Card>
