@@ -5,7 +5,8 @@ import agregar as agregar
 import seleccionar as seleccionar
 import eliminar as eliminar
 import actualizar as actualizar
-# from utils import auth  # TODO: Implementar módulo de autenticación
+# Autenticación con bcrypt usando pgcrypto de PostgreSQL
+# Las contraseñas se almacenan hasheadas en la base de datos
 from pydantic import BaseModel
 from typing import Optional
 import traceback
@@ -127,12 +128,12 @@ def health():
 @app.post("/api/auth/login")
 def login(credentials: LoginRequest):
     """
-    Endpoint de login - verifica credenciales contra la base de datos usando RUT
+    Endpoint de login - verifica credenciales contra la base de datos usando RUT con contraseñas hasheadas
     """
     print(f"🔑 Intento de login - RUT: {credentials.username}")
     
     # Verificar si es administrador
-    resultado_admin = seleccionar.seleccionarAdministradorPorRut(credentials.username)
+    resultado_admin = seleccionar.seleccionarAdministradorPorRutConHash(credentials.username, credentials.password)
     
     if resultado_admin["status"] == "error":
         print(f"❌ Error de BD al buscar administrador: {resultado_admin.get('message')}")
@@ -143,21 +144,18 @@ def login(credentials: LoginRequest):
     
     if resultado_admin["data"]:
         admin = resultado_admin["data"][0]
-        if admin["password"] == credentials.password:
-            print(f"✅ Login exitoso - Admin: {admin['nombre']}")
-            return {
-                "status": "ok",
-                "user": {
-                    "nombre": admin["nombre"],
-                    "tipo": "admin",
-                    "rut": admin["rut"]
-                }
+        print(f"✅ Login exitoso - Admin: {admin['nombre']}")
+        return {
+            "status": "ok",
+            "user": {
+                "nombre": admin["nombre"],
+                "tipo": "admin",
+                "rut": admin["rut"]
             }
-        else:
-            print(f"⚠️ Contraseña incorrecta para administrador RUT: {credentials.username}")
+        }
     
     # Verificar si es practicante
-    resultado_practicante = seleccionar.seleccionarPracticantePorRut(credentials.username)
+    resultado_practicante = seleccionar.seleccionarPracticantePorRutConHash(credentials.username, credentials.password)
     
     if resultado_practicante["status"] == "error":
         print(f"❌ Error de BD al buscar practicante: {resultado_practicante.get('message')}")
@@ -168,21 +166,18 @@ def login(credentials: LoginRequest):
     
     if resultado_practicante["data"]:
         practicante = resultado_practicante["data"][0]
-        if practicante["password"] == credentials.password:
-            print(f"✅ Login exitoso - Practicante: {practicante['nombre']}")
-            return {
-                "status": "ok",
-                "user": {
-                    "nombre": practicante["nombre"],
-                    "tipo": "kinesiologo",
-                    "rut": practicante["rut"],
-                    "consultorio": practicante["consultorio"]
-                }
+        print(f"✅ Login exitoso - Practicante: {practicante['nombre']}")
+        return {
+            "status": "ok",
+            "user": {
+                "nombre": practicante["nombre"],
+                "tipo": "kinesiologo",
+                "rut": practicante["rut"],
+                "consultorio": practicante["consultorio"]
             }
-        else:
-            print(f"⚠️ Contraseña incorrecta para practicante RUT: {credentials.username}")
+        }
     
-    print(f"❌ RUT no encontrado: {credentials.username}")
+    print(f"❌ RUT o contraseña incorrectos: {credentials.username}")
     raise HTTPException(
         status_code=401,
         detail="RUT o contraseña incorrectos. Verifica tus credenciales."
@@ -245,8 +240,7 @@ def obtener_practicantes():
 
 @app.post("/api/practicantes")
 def crear_practicante(practicante: PracticanteCreate):
-    """Crea un nuevo practicante"""
-    # TODO: Hashear password con bcrypt antes de guardar
+    """Crea un nuevo practicante con contraseña hasheada"""
     resultado = agregar.agregarPracticante(
         practicante.nombre,
         practicante.password,

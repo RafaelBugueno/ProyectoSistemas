@@ -1,0 +1,35 @@
+-- Script para hashear todas las contraseñas existentes usando pgcrypto
+-- Este script debe ejecutarse UNA VEZ para migrar las contraseñas en texto plano a bcrypt
+
+-- Habilitar extensión pgcrypto si no está habilitada
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Hashear contraseñas de administradores
+UPDATE administrador 
+SET password = crypt(password, gen_salt('bf'))
+WHERE password NOT LIKE '$2%';  -- Solo hashear si no está ya hasheada (bcrypt empieza con $2)
+
+-- Hashear contraseñas de practicantes
+UPDATE practicante 
+SET password = crypt(password, gen_salt('bf'))
+WHERE password NOT LIKE '$2%';  -- Solo hashear si no está ya hasheada
+
+-- Verificar que las contraseñas fueron hasheadas
+SELECT 
+    'Administradores' as tabla,
+    COUNT(*) as total,
+    COUNT(CASE WHEN password LIKE '$2%' THEN 1 END) as hasheadas
+FROM administrador
+UNION ALL
+SELECT 
+    'Practicantes' as tabla,
+    COUNT(*) as total,
+    COUNT(CASE WHEN password LIKE '$2%' THEN 1 END) as hasheadas
+FROM practicante;
+
+-- Mensaje de éxito
+DO $$
+BEGIN
+    RAISE NOTICE '✅ Contraseñas hasheadas exitosamente';
+    RAISE NOTICE '⚠️  IMPORTANTE: Actualiza el backend para usar verificación con bcrypt';
+END $$;

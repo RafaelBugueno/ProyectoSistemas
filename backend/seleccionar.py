@@ -58,3 +58,29 @@ def seleccionarPracticantePorRut(rut: str):
 def seleccionarAdministradorPorRut(rut: str):
     query = f"SELECT * FROM administrador WHERE rut = '{rut}';"
     return SELECT(query)
+
+def seleccionarAdministradorPorRutConHash(rut: str, password: str):
+    """
+    Verifica credenciales de administrador usando hash bcrypt de PostgreSQL.
+    Retorna el administrador si las credenciales son correctas, None si no.
+    """
+    query = f"""
+    SELECT nombre, rut 
+    FROM administrador 
+    WHERE rut = '{rut}' 
+    AND password = crypt('{password}', password);
+    """
+    return SELECT(query)
+
+def seleccionarPracticantePorRutConHash(rut: str, password: str):
+    """
+    Verifica credenciales de practicante usando hash bcrypt de PostgreSQL.
+    Retorna el practicante si las credenciales son correctas, None si no.
+    """
+    query = f"""
+    SELECT nombre, rut, consultorio 
+    FROM practicante 
+    WHERE rut = '{rut}' 
+    AND password = crypt('{password}', password);
+    """
+    return SELECT(query)

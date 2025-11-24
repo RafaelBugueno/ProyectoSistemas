@@ -22,15 +22,17 @@ def agregarConsultorio(nombre: str, direccion: str):
     return INSERT(query)
 
 def agregarPracticante(nombre: str, password: str, rut: str, consultorio: str):
+    # Usar crypt de PostgreSQL para hashear la contraseña con bcrypt
     query = f'''
     INSERT INTO practicante (nombre, password, rut, consultorio)
-    VALUES ('{nombre}', '{password}', '{rut}', '{consultorio}');
+    VALUES ('{nombre}', crypt('{password}', gen_salt('bf')), '{rut}', '{consultorio}');
     '''
     return INSERT(query)
 
 def agregarAdministrador(nombre: str, password: str, rut: str):
+    # Usar crypt de PostgreSQL para hashear la contraseña con bcrypt
     query = f'''
     INSERT INTO administrador (nombre, password, rut)
-    VALUES ('{nombre}', '{password}', '{rut}');
+    VALUES ('{nombre}', crypt('{password}', gen_salt('bf')), '{rut}');
     '''
     return INSERT(query)
