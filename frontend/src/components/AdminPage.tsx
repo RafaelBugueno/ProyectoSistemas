@@ -461,7 +461,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
         const coincide = 
           nombreKinesiologo.toLowerCase().includes(busqueda) ||
           tratamiento.toLowerCase().includes(busqueda) ||
-          (registro.especialidad || "").toLowerCase().includes(busqueda) ||
           registro.fecha.toLowerCase().includes(busqueda) ||
           registro.hora.toLowerCase().includes(busqueda) ||
           nombreConsultorio.toLowerCase().includes(busqueda);
@@ -1189,7 +1188,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                     <TableHeader>
                       <TableRow className="bg-gray-50">
                         <TableHead className="text-gray-700">Profesional</TableHead>
-                        <TableHead className="text-gray-700">Especialidad</TableHead>
                         <TableHead className="text-gray-700">Tratamiento</TableHead>
                         <TableHead className="text-gray-700">Consultorio</TableHead>
                         <TableHead className="text-gray-700">Fecha</TableHead>
@@ -1209,11 +1207,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                                 {registro.nombre_practicante || registro.kinesiologo_nombre || registro.practicante_nombre || "Sin nombre"}
                               </span>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="border-cyan-200 text-cyan-700 bg-cyan-50">
-                              {registro.especialidad || "Sin especificar"}
-                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge className="bg-blue-600">

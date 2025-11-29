@@ -32,3 +32,4 @@ def actualizarEstadoPracticante(nombre: str, estado: str):
     """
     return UPDATE(query)
 
+print("vendo pan")
