@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: kinesiologia-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=kinesiologia.cb2682icmjpq.us-east-2.rds.amazonaws.com
+      - DB_PORT=5432
+      - DB_NAME=kinesiologia
+      - DB_USER=postgres
+      - DB_PASSWORD=kinesiologia
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

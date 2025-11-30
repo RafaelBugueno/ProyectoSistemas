@@ -1,12 +1,13 @@
 import psycopg2
 from typing import Dict, Any
+import os
 
 # Configuración de la base de datos
-HOST = "localhost"
-DATABASE = "kinesiologia"
-USER = "postgres"
-PASSWORD = "cacaseca000"  # Cambiar por tu contraseña
-PORT = 5432
+HOST = os.getenv("DB_HOST", "localhost")
+DATABASE = os.getenv("DB_NAME", "kinesiologia")
+USER = os.getenv("DB_USER", "postgres")
+PASSWORD = os.getenv("DB_PASSWORD", "cacaseca000")
+PORT = int(os.getenv("DB_PORT", "5432"))
 
 def INSERT(query_params: tuple) -> Dict[str, Any]:
     """Ejecuta una query INSERT y retorna el resultado
