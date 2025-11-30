@@ -23,7 +23,7 @@ FROM nginx:1.25-alpine
 WORKDIR /usr/share/nginx/html
 
 # Copy build output
-COPY --from=build /app/dist .
+COPY --from=build /app/build .
 
 # Nginx config for SPA routing
 COPY nginx.conf /etc/nginx/conf.d/default.conf
