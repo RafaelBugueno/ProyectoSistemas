@@ -6,17 +6,23 @@ def seleccionarAtencion(*, nombrePracticante=None, consultorio=None, tipoAtencio
     Si un parámetro es None, no se aplica ese filtro.
     """
     conditions = []
+    params = []
     
     if nombrePracticante is not None:
-        conditions.append(f"nombre_practicante = '{nombrePracticante}'")
+        conditions.append("nombre_practicante = %s")
+        params.append(nombrePracticante)
     if consultorio is not None:
-        conditions.append(f"consultorio = '{consultorio}'")
+        conditions.append("consultorio = %s")
+        params.append(consultorio)
     if tipoAtencion is not None:
-        conditions.append(f"tipo_atencion = '{tipoAtencion}'")
+        conditions.append("tipo_atencion = %s")
+        params.append(tipoAtencion)
     if fechaInicio is not None:
-        conditions.append(f"fecha >= '{fechaInicio}'")
+        conditions.append("fecha >= %s")
+        params.append(fechaInicio)
     if fechaFinal is not None:
-        conditions.append(f"fecha <= '{fechaFinal}'")
+        conditions.append("fecha <= %s")
+        params.append(fechaFinal)
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
     
@@ -25,72 +31,79 @@ def seleccionarAtencion(*, nombrePracticante=None, consultorio=None, tipoAtencio
     WHERE {where_clause}
     ORDER BY fecha DESC;
     """
-    return SELECT(query)
+    return SELECT((query, tuple(params)))
 
 def seleccionarTodasLasAtenciones():
     query = "SELECT * FROM atencion ORDER BY fecha DESC;"
-    return SELECT(query)
+    return SELECT((query, ()))
 
 def seleccionarTipoAtencion():
     query = "SELECT * FROM tipo_atencion ORDER BY nombre;"
-    return SELECT(query)
+    return SELECT((query, ()))
 
 def seleccionarConsultorio():
     query = "SELECT * FROM consultorio ORDER BY nombre;"
-    return SELECT(query)
+    return SELECT((query, ()))
 
 def seleccionarConsultoriosDePracticante(rut: str):
-    query = f"""
+    query = """
     SELECT c.nombre, c.estado
     FROM practicante_consultorio pc
     JOIN consultorio c ON pc.consultorio_nombre = c.nombre
-    WHERE pc.rut_practicante = '{rut}'
+    WHERE pc.rut_practicante = %s
     ORDER BY c.nombre;
     """
-    return SELECT(query)
+    params = (rut,)
+    return SELECT((query, params))
 
 def seleccionarPracticantes():
     query = "SELECT nombre, rut, consultorio, estado FROM practicante ORDER BY nombre;"
-    return SELECT(query)
+    return SELECT((query, ()))
 
 def seleccionarPracticantePorNombre(nombre: str):
-    query = f"SELECT * FROM practicante WHERE nombre = '{nombre}';"
-    return SELECT(query)
+    query = "SELECT * FROM practicante WHERE nombre = %s;"
+    params = (nombre,)
+    return SELECT((query, params))
 
 def seleccionarAdministradorPorNombre(nombre: str):
-    query = f"SELECT * FROM administrador WHERE nombre = '{nombre}';"
-    return SELECT(query)
+    query = "SELECT * FROM administrador WHERE nombre = %s;"
+    params = (nombre,)
+    return SELECT((query, params))
 
 def seleccionarPracticantePorRut(rut: str):
-    query = f"SELECT * FROM practicante WHERE rut = '{rut}';"
-    return SELECT(query)
+    query = "SELECT * FROM practicante WHERE rut = %s;"
+    params = (rut,)
+    return SELECT((query, params))
 
 def seleccionarAdministradorPorRut(rut: str):
-    query = f"SELECT * FROM administrador WHERE rut = '{rut}';"
-    return SELECT(query)
+    query = "SELECT * FROM administrador WHERE rut = %s;"
+    params = (rut,)
+    return SELECT((query, params))
 
 def seleccionarAdministradorPorRutConHash(rut: str, password: str):
     """
     Verifica credenciales de administrador usando hash bcrypt de PostgreSQL.
     Retorna el administrador si las credenciales son correctas, None si no.
     """
-    query = f"""
+    query = """
     SELECT nombre, rut 
     FROM administrador 
-    WHERE rut = '{rut}' 
-    AND password = crypt('{password}', password);
+    WHERE rut = %s 
+    AND password = crypt(%s, password);
     """
-    return SELECT(query)
+    params = (rut, password)
+    return SELECT((query, params))
 
 def seleccionarPracticantePorRutConHash(rut: str, password: str):
     """
     Verifica credenciales de practicante usando hash bcrypt de PostgreSQL.
     Retorna el practicante si las credenciales son correctas, None si no.
     """
-    query = f"""
+    query = """
     SELECT nombre, rut, consultorio 
     FROM practicante 
-    WHERE rut = '{rut}' 
-    AND password = crypt('{password}', password);
+    WHERE rut = %s 
+    AND password = crypt(%s, password);
     """
-    return SELECT(query)
+    params = (rut, password)
+    return SELECT((query, params))

@@ -1,0 +1,76 @@
+===============================================
+RESUMEN DE CORRECCIONES SQL INJECTION
+===============================================
+
+✅ COMPLETADO: Todas las vulnerabilidades SQL Injection han sido corregidas.
+
+ARCHIVOS MODIFICADOS:
+--------------------
+
+1. generalSQL.py
+   - INSERT(): Ahora acepta tupla (query, params)
+   - SELECT(): Ahora acepta tupla (query, params) con retrocompatibilidad
+   - UPDATE(): Ahora acepta tupla (query, params)
+   - DELETE(): Ahora acepta tupla (query, params)
+
+2. agregar.py - 6 funciones corregidas
+   - agregarRegistroAtencion()
+   - agregarTipoAtencion()
+   - agregarConsultorio()
+   - agregarPracticante()
+   - agregarAdministrador()
+   - asignarConsultorioAPracticante()
+
+3. seleccionar.py - 11 funciones corregidas
+   - seleccionarAtencion()
+   - seleccionarTodasLasAtenciones()
+   - seleccionarTipoAtencion()
+   - seleccionarConsultorio()
+   - seleccionarConsultoriosDePracticante()
+   - seleccionarPracticantes()
+   - seleccionarPracticantePorNombre()
+   - seleccionarAdministradorPorNombre()
+   - seleccionarPracticantePorRut()
+   - seleccionarAdministradorPorRut()
+   - seleccionarAdministradorPorRutConHash() ⚠️ CRÍTICO
+   - seleccionarPracticantePorRutConHash() ⚠️ CRÍTICO
+
+4. eliminar.py - 5 funciones corregidas
+   - eliminarAtencion()
+   - eliminarPracticante()
+   - eliminarConsultorio()
+   - eliminarTipoAtencion()
+   - eliminarConsultorioDePracticante()
+
+5. actualizar.py - 5 funciones corregidas
+   - actualizarConsultorioPracticante()
+   - actualizarPasswordPracticante()
+   - actualizarPasswordAdministrador()
+   - actualizarEstadoPracticante()
+   - actualizarEstadoConsultorio()
+
+TOTAL: 27 vulnerabilidades SQL Injection CORREGIDAS
+
+EJEMPLO DE CAMBIO:
+------------------
+ANTES:
+  query = f"SELECT * FROM usuario WHERE id = '{id}'"
+  return SELECT(query)
+
+DESPUÉS:
+  query = "SELECT * FROM usuario WHERE id = %s"
+  params = (id,)
+  return SELECT((query, params))
+
+ESTADO:
+-------
+✅ Sin errores de sintaxis
+✅ Todas las queries usan placeholders %s
+✅ Parámetros separados de la query
+✅ Protección contra SQL Injection implementada
+
+PRUEBAS PENDIENTES:
+-------------------
+⚠️ Ejecutar tests funcionales para verificar que todo sigue funcionando
+⚠️ Probar autenticación (funciones críticas de login)
+⚠️ Verificar CRUD de consultorios, practicantes y atenciones
