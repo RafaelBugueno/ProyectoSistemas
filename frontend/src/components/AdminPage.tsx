@@ -63,6 +63,8 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [showConfirmAsignarConsultorio, setShowConfirmAsignarConsultorio] = useState(false);
   const [showConfirmQuitarConsultorio, setShowConfirmQuitarConsultorio] = useState(false);
   const [consultorioParaQuitar, setConsultorioParaQuitar] = useState<string>("");
+  const [nuevaPassword, setNuevaPassword] = useState<string>("");
+  const [showConfirmCambiarPassword, setShowConfirmCambiarPassword] = useState(false);
 
   const cargarRegistros = async () => {
     console.log("🔄 AdminPage: Cargando registros...");
@@ -379,6 +381,37 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
 
     setShowConfirmCambiarEstado(true);
+  };
+
+  const handleCambiarPassword = () => {
+    if (!practicanteSeleccionado) {
+      toast.error("Selecciona un practicante primero");
+      return;
+    }
+    if (!nuevaPassword.trim()) {
+      toast.error("Ingresa una nueva contraseña");
+      return;
+    }
+    setShowConfirmCambiarPassword(true);
+  };
+
+  const confirmarCambiarPassword = async () => {
+    setShowConfirmCambiarPassword(false);
+    
+    if (!practicanteSeleccionado || !nuevaPassword.trim()) {
+      return;
+    }
+
+    try {
+      await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteSeleccionado)}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: nuevaPassword }),
+      });
+      toast.success("Contraseña actualizada exitosamente");
+      setNuevaPassword("");
+    } catch (error: any) {
+      toast.error(error.message || "Error al cambiar contraseña");
+    }
   };
 
   const confirmarCambiarEstadoPracticante = async () => {
@@ -844,18 +877,44 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   </SelectContent>
                 </Select>
                 {practicanteSeleccionado && practicanteActual && (
-                  <div className="flex gap-2 mt-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleCambiarEstadoPracticante}
-                      className={
-                        practicanteActual.estado === "activo"
-                          ? "btn-desactivar-practicante"
-                          : "btn-activar-practicante"
-                      }
-                    >
-                      {practicanteActual.estado === "activo" ? "Desactivar" : "Activar"} practicante
-                    </Button>
+                  <div className="space-y-3 mt-3">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleCambiarEstadoPracticante}
+                        className={
+                          practicanteActual.estado === "activo"
+                            ? "btn-desactivar-practicante"
+                            : "btn-activar-practicante"
+                        }
+                      >
+                        {practicanteActual.estado === "activo" ? "Desactivar" : "Activar"} practicante
+                      </Button>
+                    </div>
+                    
+                    <div className="pt-3 border-t border-gray-100">
+                      <Label className="text-gray-700 text-xs mb-2 block">Cambiar contraseña</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="password"
+                          placeholder="Nueva contraseña"
+                          value={nuevaPassword}
+                          onChange={(e) => setNuevaPassword(e.target.value)}
+                          className="border-gray-300"
+                        />
+                        <Button
+                          onClick={handleCambiarPassword}
+                          disabled={!nuevaPassword.trim()}
+                          style={{
+                            backgroundColor: nuevaPassword.trim() ? '#9333ea' : undefined,
+                            color: 'white'
+                          }}
+                          className="hover:bg-purple-700"
+                        >
+                          Cambiar
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1430,6 +1489,22 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           <button className="confirm-btn-confirm" onClick={confirmarCambiarEstadoPracticante}>
             {practicanteActual?.estado === "activo" ? "Desactivar" : "Activar"}
           </button>
+        </div>
+      </div>
+
+      {/* Diálogo: Cambiar Contraseña */}
+      <div 
+        className={showConfirmCambiarPassword ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmCambiarPassword(false)}
+      />
+      <div className={showConfirmCambiarPassword ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Cambiar contraseña?</div>
+        <div className="confirm-message">
+          ¿Estás seguro de que deseas cambiar la contraseña del practicante <strong>{practicanteSeleccionado}</strong>?
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmCambiarPassword(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarCambiarPassword}>Confirmar</button>
         </div>
       </div>
 

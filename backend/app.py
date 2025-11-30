@@ -448,6 +448,39 @@ def eliminar_atencion_endpoint(id: int):
 
 
 # ============================================
+# ENDPOINTS DE ACTUALIZACIÓN DE PRACTICANTES
+# ============================================
+
+@app.patch("/api/practicantes/{nombre}/password")
+async def actualizar_password_practicante(nombre: str, request: Request):
+    """Actualiza la contraseña de un practicante usando bcrypt"""
+    try:
+        data = await request.json()
+        nueva_password = data.get("password")
+        
+        if not nueva_password:
+            return {"status": "error", "message": "Password requerida"}
+        
+        # Verificar que el practicante existe
+        practicante = seleccionar.seleccionarPracticantePorNombre(nombre)
+        if practicante["status"] != "ok" or not practicante["data"]:
+            return {"status": "error", "message": "Practicante no encontrado"}
+        
+        # Actualizar password usando crypt para bcrypt
+        from generalSQL import UPDATE
+        query = """
+        UPDATE practicante
+        SET password = crypt(%s, gen_salt('bf'))
+        WHERE nombre = %s;
+        """
+        params = (nueva_password, nombre)
+        resultado = UPDATE((query, params))
+        
+        return resultado
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ============================================
 # ENDPOINTS DE ESTADÍSTICAS (para AdminPage)
 # ============================================
 
