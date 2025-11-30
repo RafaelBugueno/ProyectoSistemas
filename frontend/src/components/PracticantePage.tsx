@@ -28,6 +28,7 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
   const [locationError, setLocationError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
 
   const tratamientos = [
     "Rehabilitación Traumatológica",
@@ -45,42 +46,45 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
   ];
 
   useEffect(() => {
-    // Obtener geolocalización al cargar
+    // No pedimos ubicación al montar; lo haremos al registrar
+  }, []);
+
+  const obtenerUbicacion = (opts?: PositionOptions, onSuccess?: () => void, onFail?: () => void) => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
+          setLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
           setLocationError(false);
+          if (onSuccess) onSuccess();
         },
         (error) => {
           console.warn("No se pudo obtener la ubicación:", error.message || "Permiso denegado");
           setLocationError(true);
-          // Usar ubicación por defecto si falla
-          setLocation({
-            lat: 0,
-            lng: 0,
-          });
+          setLocation({ lat: 0, lng: 0 });
+          if (onFail) onFail();
         },
-        {
-          timeout: 10000,
-          enableHighAccuracy: false,
-        }
+        { enableHighAccuracy: true, timeout: 10000, ...opts }
       );
     } else {
       setLocationError(true);
-      setLocation({
-        lat: 0,
-        lng: 0,
-      });
+      setLocation({ lat: 0, lng: 0 });
+      if (onFail) onFail();
     }
-  }, []);
+  };
 
   const handleRegistrar = () => {
     if (!tratamiento) {
       toast.error("Por favor selecciona un tratamiento");
+      return;
+    }
+    // Pedir ubicación en el momento de uso si no está disponible
+    const needsLocation = !location || (location.lat === 0 && location.lng === 0);
+    if (needsLocation) {
+      obtenerUbicacion(
+        { enableHighAccuracy: true, timeout: 10000 },
+        () => setShowConfirmDialog(true),
+        () => setShowLocationPrompt(true)
+      );
       return;
     }
 
@@ -258,6 +262,33 @@ export function PracticantePage({ user, onLogout }: PracticantePageProps) {
               </div>
             </CardContent>
           </Card>
+        </div>
+      </div>
+
+      {/* Diálogo: Activar ubicación */}
+      <div 
+        className={showLocationPrompt ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowLocationPrompt(false)}
+      />
+      <div className={showLocationPrompt ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">Activar ubicación</div>
+        <div className="confirm-message">
+          Para registrar la sesión necesitamos tu ubicación actual. Por favor permite el acceso a la ubicación del navegador.
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowLocationPrompt(false)}>Cancelar</button>
+          <button
+            className="confirm-btn-confirm"
+            onClick={() => {
+              obtenerUbicacion(
+                { enableHighAccuracy: true, timeout: 10000 },
+                () => { setShowLocationPrompt(false); setShowConfirmDialog(true); },
+                () => toast.error("No se pudo activar la ubicación. Revisa los permisos del navegador.")
+              );
+            }}
+          >
+            Activar ubicación
+          </button>
         </div>
       </div>
 

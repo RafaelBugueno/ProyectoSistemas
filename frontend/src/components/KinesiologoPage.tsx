@@ -26,8 +26,9 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
   const [showQR, setShowQR] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
 
-const obtenerUbicacion = () => {
+const obtenerUbicacion = (opts?: PositionOptions, onSuccess?: () => void, onFail?: () => void) => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -36,6 +37,7 @@ const obtenerUbicacion = () => {
           lng: position.coords.longitude,
         });
         setLocationError(false);
+        if (onSuccess) onSuccess();
       },
       (error) => {
         console.warn("No se pudo obtener la ubicación:", error.message || "Permiso denegado");
@@ -45,10 +47,12 @@ const obtenerUbicacion = () => {
           lat: 0,
           lng: 0,
         });
+        if (onFail) onFail();
       },
       {
         timeout: 10000,
-        enableHighAccuracy: false,
+        enableHighAccuracy: true,
+        ...opts,
       }
     );
   } else {
@@ -159,7 +163,7 @@ const handleSincronizarDatos = async () => {
 };
 
   useEffect(() => {
-    obtenerUbicacion();
+    // Cargamos datos, pero pediremos ubicación justo al registrar
     cargarDatosIniciales();
   }, []);
 
@@ -172,6 +176,18 @@ const handleSincronizarDatos = async () => {
 
     if (!consultorioSeleccionado) {
       toast.error("Por favor selecciona un consultorio");
+      return;
+    }
+
+    // Si no tenemos ubicación válida, pedir activación justo ahora
+    const needsLocation = !location || (location.lat === 0 && location.lng === 0);
+    if (needsLocation) {
+      // Intentar obtener directamente; si el usuario deniega, mostramos prompt
+      obtenerUbicacion(
+        { enableHighAccuracy: true, timeout: 10000 },
+        () => setShowConfirmDialog(true),
+        () => setShowLocationPrompt(true)
+      );
       return;
     }
 
@@ -304,6 +320,33 @@ const handleSincronizarDatos = async () => {
                 Cerrar Sesión
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Diálogo: Activar ubicación */}
+        <div 
+          className={showLocationPrompt ? "confirm-overlay show" : "confirm-overlay"}
+          onClick={() => setShowLocationPrompt(false)}
+        />
+        <div className={showLocationPrompt ? "confirm-dialog show" : "confirm-dialog"}>
+          <div className="confirm-title">Activar ubicación</div>
+          <div className="confirm-message">
+            Para registrar la sesión necesitamos tu ubicación actual. Por favor permite el acceso a la ubicación del navegador.
+          </div>
+          <div className="confirm-buttons">
+            <button className="confirm-btn-cancel" onClick={() => setShowLocationPrompt(false)}>Cancelar</button>
+            <button
+              className="confirm-btn-confirm"
+              onClick={() => {
+                obtenerUbicacion(
+                  { enableHighAccuracy: true, timeout: 10000 },
+                  () => { setShowLocationPrompt(false); setShowConfirmDialog(true); },
+                  () => toast.error("No se pudo activar la ubicación. Revisa los permisos del navegador.")
+                );
+              }}
+            >
+              Activar ubicación
+            </button>
           </div>
         </div>
 
