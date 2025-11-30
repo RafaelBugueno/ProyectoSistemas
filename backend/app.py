@@ -300,6 +300,7 @@ def crear_tipo_atencion(tipo: TipoAtencionCreate):
     raise HTTPException(status_code=500, detail=resultado.get("message", "Error al crear tipo de atención"))
 
 
+
 # ============================================
 # ENDPOINTS DE PRACTICANTES
 # ============================================

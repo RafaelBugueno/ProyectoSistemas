@@ -43,6 +43,10 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [consultorios, setConsultorios] = useState<Consultorio[]>([]);
   const [nuevoConsultorioNombre, setNuevoConsultorioNombre] = useState<string>("");
   const [nuevoConsultorioDireccion, setNuevoConsultorioDireccion] = useState<string>("");
+  // Tipos de atención
+  const [tiposAtencion, setTiposAtencion] = useState<string[]>([]);
+  const [nuevoTipoAtencion, setNuevoTipoAtencion] = useState<string>("");
+  const [tipoAtencionSeleccionado, setTipoAtencionSeleccionado] = useState<string>("");
 
   const [practicantes, setPracticantes] = useState<Practicante[]>([]);
   const [practicanteSeleccionado, setPracticanteSeleccionado] = useState<string>("");
@@ -137,6 +141,28 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     setConsultorios(consultoriosIniciales);
   };
 
+  const cargarTiposAtencion = async () => {
+    console.log("🩺 AdminPage: Cargando tipos de atención...");
+    try {
+      const response = await apiRequest("/api/tipos-atencion");
+      if (response.status === "ok") {
+        const lista = (response.data || []).map((t: any) => t.nombre);
+        setTiposAtencion(lista);
+        localStorage.setItem("tiposAtencion", JSON.stringify(lista));
+        console.log("✅ AdminPage: Tipos de atención cargados:", lista.length);
+        return;
+      }
+    } catch (error) {
+      console.warn("⚠️ AdminPage: Error al cargar tipos de atención, usando localStorage", error);
+    }
+    try {
+      const data = JSON.parse(localStorage.getItem("tiposAtencion") || "[]");
+      setTiposAtencion(Array.isArray(data) ? data : []);
+    } catch {
+      setTiposAtencion([]);
+    }
+  };
+
   const cargarPracticantes = async () => {
     console.log("👨‍⚕️ AdminPage: Cargando practicantes...");
     try {
@@ -171,7 +197,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     
     const inicializar = async () => {
       try {
-        await Promise.all([cargarRegistros(), cargarConsultorios(), cargarPracticantes()]);
+        await Promise.all([cargarRegistros(), cargarConsultorios(), cargarPracticantes(), cargarTiposAtencion()]);
         console.log("✅ AdminPage: Datos iniciales cargados correctamente");
       } catch (error) {
         console.error("❌ AdminPage: Error al inicializar:", error);
@@ -259,6 +285,46 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       toast.success("Consultorio agregado exitosamente");
     } catch (error: any) {
       toast.error(error.message || "Error al agregar consultorio");
+    }
+  };
+
+  const handleAgregarTipoAtencion = async () => {
+    const nombre = nuevoTipoAtencion.trim();
+    if (!nombre) {
+      toast.error("El nombre del tipo de atención es requerido");
+      return;
+    }
+    try {
+      await apiRequest("/api/tipos-atencion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre })
+      });
+      const actualizados = [...tiposAtencion, nombre].sort();
+      setTiposAtencion(actualizados);
+      localStorage.setItem("tiposAtencion", JSON.stringify(actualizados));
+      setNuevoTipoAtencion("");
+      toast.success("Tipo de atención agregado");
+    } catch (error: any) {
+      toast.error(error.message || "Error al agregar tipo de atención");
+    }
+  };
+
+  const handleEliminarTipoAtencion = async () => {
+    const nombre = tipoAtencionSeleccionado;
+    if (!nombre) {
+      toast.error("Selecciona un tipo de atención primero");
+      return;
+    }
+    try {
+      await apiRequest(`/api/tipos-atencion/${encodeURIComponent(nombre)}`, { method: "DELETE" });
+      const actualizados = tiposAtencion.filter(t => t !== nombre);
+      setTiposAtencion(actualizados);
+      localStorage.setItem("tiposAtencion", JSON.stringify(actualizados));
+      setTipoAtencionSeleccionado("");
+      toast.success("Tipo de atención eliminado");
+    } catch (error: any) {
+      toast.error(error.message || "Error al eliminar tipo de atención");
     }
   };
 
@@ -811,6 +877,40 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
           </CardContent>
         </Card>
 
+        {/* Gestión de Tipos de Atención (independiente) */}
+        <Card className="border-0 shadow-lg mb-6">
+          <CardHeader>
+            <CardTitle className="text-gray-800">Gestión tipos de atención</CardTitle>
+            <CardDescription>Agrega tipos disponibles</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+              <Input
+                placeholder="Nuevo tipo de atención"
+                value={nuevoTipoAtencion}
+                onChange={(e) => setNuevoTipoAtencion(e.target.value)}
+                className="border-gray-300"
+              />
+              <Button onClick={handleAgregarTipoAtencion} disabled={!nuevoTipoAtencion.trim()}>Agregar</Button>
+            </div>
+
+            <div>
+              <Label className="text-gray-700">Tipos registrados</Label>
+              <div className="overflow-x-auto">
+                <div className="flex gap-2 pb-2 mt-2 min-w-max">
+                  {tiposAtencion.length === 0 ? (
+                    <span className="text-sm text-gray-500">Sin tipos registrados</span>
+                  ) : (
+                    tiposAtencion.map((t) => (
+                      <Badge key={t} className="bg-gray-100 text-gray-700 whitespace-nowrap">{t}</Badge>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Gestión de Practicantes */}
         <Card className="border-0 shadow-lg mb-6">
           <CardHeader className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -974,6 +1074,8 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   </p>
                 </div>
               </div>
+
+              {/* (Se movió la gestión de tipos de atención a su propio card fuera de esta sección) */}
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-100">

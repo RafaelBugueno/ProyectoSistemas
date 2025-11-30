@@ -3,6 +3,7 @@ import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import iconoKine from "../assets/icono-kine.png";
 import { LogOut, CheckCircle2, Activity, QrCode, RefreshCw } from "lucide-react";
 import { toast } from "./ui/sonner";
 import { Badge } from "./ui/badge";
@@ -265,7 +266,7 @@ const handleSincronizarDatos = async () => {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center">
-                <img src="/src/assets/icono-kine.png" alt="Ícono de Kinesiología" className="h-9 w-9" />
+                <img src={iconoKine} alt="Ícono de Kinesiología" className="h-9 w-9" />
               </div>
               <div>
                 <h1 className="text-gray-900 flex items-center gap-2">

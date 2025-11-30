@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import iconoKine from "../assets/icono-kine.png";
 import { Label } from "./ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Heart } from "lucide-react";
@@ -76,7 +77,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           <div className="flex items-center justify-center mb-6">
             <div className="relative">
               <div className="h-20 w-20 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg">
-                <img src="/src/assets/icono-kine.png" alt="kine" className="h-16 w-16 mx-auto" />
+                <img src={iconoKine} alt="kine" className="h-16 w-16 mx-auto" />
               </div>
               <div className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-teal-500 flex items-center justify-center border-4 border-white">
                 <Heart className="h-4 w-4 text-white" fill="white" />
