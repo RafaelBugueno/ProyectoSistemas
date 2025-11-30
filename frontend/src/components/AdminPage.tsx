@@ -584,7 +584,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-4">
+    <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 p-4 min-h-[calc(100vh-80px)]">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-blue-600">

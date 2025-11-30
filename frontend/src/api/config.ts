@@ -5,11 +5,32 @@ export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export const apiRequest = async (endpoint: string, options: RequestInit = {}) => {
   const url = `${API_URL}${endpoint}`;
   
+  // Recuperar token si existe y no está expirado
+  let authHeader: Record<string, string> = {};
+  try {
+    const raw = localStorage.getItem('auth');
+    if (raw) {
+      const auth = JSON.parse(raw);
+      if (auth?.token && auth?.expiresAt) {
+        const now = Math.floor(Date.now() / 1000);
+        if (now < Number(auth.expiresAt)) {
+          authHeader = { Authorization: `Bearer ${auth.token}` };
+        } else {
+          // Token expirado: limpiar
+          localStorage.removeItem('auth');
+        }
+      }
+    }
+  } catch {
+    // Ignorar errores de parseo
+  }
+
   const defaultOptions: RequestInit = {
     mode: 'cors',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      ...authHeader,
       ...options.headers,
     },
     ...options,

@@ -10,6 +10,11 @@ import actualizar as actualizar
 from pydantic import BaseModel
 from typing import Optional
 import traceback
+import time
+import hmac
+import hashlib
+import base64
+import json
 
 # Modelos Pydantic para request/response #
 
@@ -67,6 +72,47 @@ class SincronizarRequest(BaseModel):
 #     return current_user
 
 app = FastAPI(title="Proyecto Kinesiologia")
+
+# =============================
+# Token (HMAC) utilities
+# =============================
+SECRET_KEY = "super-secret-key-change-me"
+TOKEN_EXP_SECONDS = 2 * 60 * 60  # 2 horas
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+def _b64url_decode(data: str) -> bytes:
+    padding = 4 - (len(data) % 4)
+    if padding != 4:
+        data += "=" * padding
+    return base64.urlsafe_b64decode(data.encode("utf-8"))
+
+def create_token(payload: dict, exp_seconds: int = TOKEN_EXP_SECONDS) -> dict:
+    now = int(time.time())
+    exp = now + exp_seconds
+    body = {**payload, "iat": now, "exp": exp}
+    body_json = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    signature = hmac.new(SECRET_KEY.encode("utf-8"), body_json, hashlib.sha256).digest()
+    token = f"{_b64url_encode(body_json)}.{_b64url_encode(signature)}"
+    return {"token": token, "exp": exp}
+
+def verify_token(token: str) -> Optional[dict]:
+    try:
+        parts = token.split(".")
+        if len(parts) != 2:
+            return None
+        body_json_b64, sig_b64 = parts
+        body_json = _b64url_decode(body_json_b64)
+        expected_sig = hmac.new(SECRET_KEY.encode("utf-8"), body_json, hashlib.sha256).digest()
+        if not hmac.compare_digest(expected_sig, _b64url_decode(sig_b64)):
+            return None
+        body = json.loads(body_json.decode("utf-8"))
+        if int(time.time()) > int(body.get("exp", 0)):
+            return None
+        return body
+    except Exception:
+        return None
 
 # Middleware para logging de requests (declarado PRIMERO para ejecutarse ÚLTIMO)
 @app.middleware("http")
@@ -144,6 +190,7 @@ def login(credentials: LoginRequest):
     
     if resultado_admin["data"]:
         admin = resultado_admin["data"][0]
+        token_info = create_token({"tipo": "admin", "rut": admin["rut"], "nombre": admin["nombre"]})
         print(f"✅ Login exitoso - Admin: {admin['nombre']}")
         return {
             "status": "ok",
@@ -151,7 +198,9 @@ def login(credentials: LoginRequest):
                 "nombre": admin["nombre"],
                 "tipo": "admin",
                 "rut": admin["rut"]
-            }
+            },
+            "token": token_info["token"],
+            "expiresAt": token_info["exp"]
         }
     
     # Verificar si es practicante
@@ -166,6 +215,7 @@ def login(credentials: LoginRequest):
     
     if resultado_practicante["data"]:
         practicante = resultado_practicante["data"][0]
+        token_info = create_token({"tipo": "kinesiologo", "rut": practicante["rut"], "nombre": practicante["nombre"], "consultorio": practicante["consultorio"]})
         print(f"✅ Login exitoso - Practicante: {practicante['nombre']}")
         return {
             "status": "ok",
@@ -174,7 +224,9 @@ def login(credentials: LoginRequest):
                 "tipo": "kinesiologo",
                 "rut": practicante["rut"],
                 "consultorio": practicante["consultorio"]
-            }
+            },
+            "token": token_info["token"],
+            "expiresAt": token_info["exp"]
         }
     
     print(f"❌ RUT o contraseña incorrectos: {credentials.username}")

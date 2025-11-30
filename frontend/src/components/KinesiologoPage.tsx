@@ -239,7 +239,7 @@ const handleSincronizarDatos = async () => {
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}&color=0891b2&bgcolor=ffffff`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-4">
+    <div className="bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-4 min-h-[calc(100vh-80px)]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-cyan-600">

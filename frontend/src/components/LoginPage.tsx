@@ -32,6 +32,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       });
 
       if (response.status === "ok" && response.user) {
+        // Persistir token + usuario
+        if (response.token && response.expiresAt) {
+          localStorage.setItem('auth', JSON.stringify({
+            user: response.user,
+            token: response.token,
+            expiresAt: response.expiresAt
+          }));
+        }
         toast.success(`Bienvenido ${response.user.nombre}`);
         onLogin(response.user);
       } else {
@@ -62,7 +70,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-4">
+    <div className="flex items-center justify-center bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-4 min-h-[calc(100vh-80px)]">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-1 pb-4">
           <div className="flex items-center justify-center mb-6">
@@ -87,12 +95,55 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <Input
                 id="rut"
                 type="text"
-                placeholder="Ejemplo: 12345678-9"
+                inputMode="text"
+                placeholder="Ejemplo: 12345678-K"
                 value={rut}
-                onChange={(e) => setRut(e.target.value)}
+                onChange={(e) => {
+                  let v = e.target.value.toUpperCase();
+                  v = v.replace(/[\.\s]/g, ''); // quitar puntos y espacios
+                  v = v.replace(/[^0-9K-]/g, ''); // permitir solo dígitos, K y guión
+
+                  // Normalizar múltiples guiones
+                  const parts = v.split('-').filter(p => p !== '');
+                  if (v.includes('-')) {
+                    // reconstruir como NUMERO-DV (tomar primeras partes)
+                    const numero = parts[0] || '';
+                    let dv = parts.slice(1).join('');
+                    dv = dv.replace(/[^0-9K]/g, '');
+                    dv = dv.slice(0,1); // solo un caracter verificador
+                    v = numero + (dv ? '-' + dv : '-');
+                  }
+
+                  // Si el usuario escribe K sin guión aún, auto-insertar guión
+                  if (!v.includes('-')) {
+                    const kPos = v.indexOf('K');
+                    if (kPos !== -1) {
+                      // separar número y K
+                      const numero = v.replace(/K/g,'');
+                      v = numero + '-' + 'K';
+                    }
+                  }
+
+                  // Limitar número a 8 dígitos antes del guión
+                  if (v.includes('-')) {
+                    const [numero, dv] = v.split('-');
+                    v = numero.slice(0,8) + '-' + dv;
+                  } else {
+                    // mientras escribe el cuerpo numérico, limitar a 8
+                    v = v.slice(0,8);
+                  }
+
+                  // Evitar guión inicial
+                  if (v.startsWith('-')) v = v.replace(/^-+/, '');
+
+                  setRut(v);
+                }}
                 className="border-gray-300"
                 required
                 disabled={loading}
+                pattern="^[0-9]{1,8}-[0-9K]$"
+                title="Formato: 1-8 dígitos, guión y dígito o K (ej: 12345678-K)"
+                maxLength={11}
               />
             </div>
             <div className="space-y-2">
