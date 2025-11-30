@@ -35,6 +35,12 @@ class PracticanteCreate(BaseModel):
     rut: str
     consultorio: str
 
+class AsignacionConsultorio(BaseModel):
+    consultorio: str
+
+class EstadoUpdate(BaseModel):
+    estado: str
+
 class AtencionCreate(BaseModel):
     fecha: str  # TIMESTAMP en formato ISO
     consultorio: str
@@ -256,6 +262,22 @@ def crear_consultorio(consultorio: ConsultorioCreate):
         return {"status": "ok", "message": "Consultorio creado exitosamente"}
     raise HTTPException(status_code=500, detail=resultado.get("message", "Error al crear consultorio"))
 
+@app.delete("/api/consultorios/{nombre}")
+def eliminar_consultorio(nombre: str):
+    """Elimina un consultorio por nombre"""
+    resultado = eliminar.eliminarConsultorio(nombre)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Consultorio eliminado exitosamente"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al eliminar consultorio"))
+
+@app.patch("/api/consultorios/{nombre}/estado")
+def actualizar_estado_consultorio(nombre: str, estado_update: EstadoUpdate):
+    """Actualiza el estado de un consultorio (activo/inactivo)"""
+    resultado = actualizar.actualizarEstadoConsultorio(nombre, estado_update.estado)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Estado del consultorio actualizado exitosamente"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al actualizar estado del consultorio"))
+
 
 # ============================================
 # ENDPOINTS DE TIPOS DE ATENCIÓN
@@ -330,6 +352,31 @@ def actualizar_practicante_endpoint(nombre: str, data: dict):
     if resultado["status"] == "ok":
         return {"status": "ok", "message": "Practicante actualizado exitosamente"}
     raise HTTPException(status_code=500, detail=resultado.get("message", "Error al actualizar practicante"))
+
+# ============================================
+# ENDPOINTS DE ASIGNACIÓN DE CONSULTORIOS A PRACTICANTES
+# ============================================
+
+@app.get("/api/practicantes/{rut}/consultorios")
+def obtener_consultorios_de_practicante(rut: str):
+    resultado = seleccionar.seleccionarConsultoriosDePracticante(rut)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "data": resultado["data"]}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al obtener consultorios del practicante"))
+
+@app.post("/api/practicantes/{rut}/consultorios")
+def asignar_consultorio_a_practicante(rut: str, body: AsignacionConsultorio):
+    resultado = agregar.asignarConsultorioAPracticante(rut, body.consultorio)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Consultorio asignado"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al asignar consultorio"))
+
+@app.delete("/api/practicantes/{rut}/consultorios/{consultorio}")
+def eliminar_consultorio_de_practicante(rut: str, consultorio: str):
+    resultado = eliminar.eliminarConsultorioDePracticante(rut, consultorio)
+    if resultado["status"] == "ok":
+        return {"status": "ok", "message": "Consultorio removido"}
+    raise HTTPException(status_code=500, detail=resultado.get("message", "Error al remover consultorio"))
 
 
 # ============================================
@@ -481,8 +528,9 @@ def sincronizar_datos(sync_request: SincronizarRequest):
             # Extraer datos del objeto localStorage (formato del frontend)
             fecha = atencion.get("fecha")
             consultorio = atencion.get("consultorio") or "Sin consultorio"
-            tipo_atencion = atencion.get("tratamiento")
-            nombre_practicante = atencion.get("kinesiologo_nombre")
+            # Soportar ambos nombres de campo (nuevo y antiguo)
+            tipo_atencion = atencion.get("tipo_atencion") or atencion.get("tratamiento")
+            nombre_practicante = atencion.get("nombre_practicante") or atencion.get("kinesiologo_nombre")
             latitud = atencion.get("latitud", 0.0)
             longitud = atencion.get("longitud", 0.0)
             

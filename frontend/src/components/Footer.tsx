@@ -1,13 +1,15 @@
 export function Footer() {
   const developers = [
-    "Pedro Sánchez",
-    "María González",
-    "Juan Rodríguez",
-    "Ana Martínez",
-    "Carlos López",
-    "Laura Fernández",
-    "Diego Torres",
-    "Sofía Ramírez"
+    "Pedro Rojas",
+    "Adolfo Toledo",
+    "Martín García",
+    "Ignacia Miranda",
+    "Esteban Zepeda",
+    "Patricio Vejar",
+    "Basthian Valenzuela",
+    "Bryan Rojas",
+    "Felipe Canales",
+    "Rafael Bugueño"
   ];
 
   return (

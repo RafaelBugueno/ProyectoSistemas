@@ -8,12 +8,16 @@ USER = "postgres"
 PASSWORD = "cacaseca000"  # Cambiar por tu contraseña
 PORT = 5432
 
-def INSERT(query: str) -> Dict[str, Any]:
-    """Ejecuta una query INSERT y retorna el resultado"""
+def INSERT(query_params: tuple) -> Dict[str, Any]:
+    """Ejecuta una query INSERT y retorna el resultado
+    Args:
+        query_params: Tupla (query, params) donde query contiene placeholders %s
+    """
     conexion, cursor = None, None
     try:
+        query, params = query_params
         conexion, cursor = __conectar()
-        cursor.execute(query)
+        cursor.execute(query, params)
         conexion.commit()
         return {"status": "ok", "message": "INSERT exitoso"}
     except Exception as e:
@@ -23,13 +27,28 @@ def INSERT(query: str) -> Dict[str, Any]:
     finally:
         __desconectar(conexion, cursor)
 
-def SELECT(query: str) -> Dict[str, Any]:
-    """Ejecuta una query SELECT y retorna los resultados"""
+def SELECT(query_params: tuple) -> Dict[str, Any]:
+    """Ejecuta una query SELECT y retorna los resultados
+    Args:
+        query_params: Tupla (query, params) donde query contiene placeholders %s
+                      Si no hay parámetros, usar (query, ()) o (query, None)
+    """
     from datetime import datetime
     conexion, cursor = None, None
     try:
+        if isinstance(query_params, tuple) and len(query_params) == 2:
+            query, params = query_params
+        else:
+            # Retrocompatibilidad: si se pasa solo un string
+            query = query_params
+            params = None
+        
         conexion, cursor = __conectar()
-        cursor.execute(query)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        
         filas = cursor.fetchall()
         columnas = [description[0] for description in cursor.description]
         resultados = []
@@ -52,12 +71,16 @@ def SELECT(query: str) -> Dict[str, Any]:
     finally:
         __desconectar(conexion, cursor)
 
-def UPDATE(query: str) -> Dict[str, Any]:
-    """Ejecuta una query UPDATE y retorna el resultado"""
+def UPDATE(query_params: tuple) -> Dict[str, Any]:
+    """Ejecuta una query UPDATE y retorna el resultado
+    Args:
+        query_params: Tupla (query, params) donde query contiene placeholders %s
+    """
     conexion, cursor = None, None
     try:
+        query, params = query_params
         conexion, cursor = __conectar()
-        cursor.execute(query)
+        cursor.execute(query, params)
         conexion.commit()
         filas_afectadas = cursor.rowcount
         return {"status": "ok", "message": f"UPDATE exitoso - {filas_afectadas} fila(s) actualizada(s)"}
@@ -68,12 +91,16 @@ def UPDATE(query: str) -> Dict[str, Any]:
     finally:
         __desconectar(conexion, cursor)
 
-def DELETE(query: str) -> Dict[str, Any]:
-    """Ejecuta una query DELETE y retorna el resultado"""
+def DELETE(query_params: tuple) -> Dict[str, Any]:
+    """Ejecuta una query DELETE y retorna el resultado
+    Args:
+        query_params: Tupla (query, params) donde query contiene placeholders %s
+    """
     conexion, cursor = None, None
     try:
+        query, params = query_params
         conexion, cursor = __conectar()
-        cursor.execute(query)
+        cursor.execute(query, params)
         conexion.commit()
         filas_afectadas = cursor.rowcount
         return {"status": "ok", "message": f"DELETE exitoso - {filas_afectadas} fila(s) eliminada(s)"}

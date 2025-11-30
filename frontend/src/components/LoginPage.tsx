@@ -70,7 +70,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   };
 
   return (
-    <div className="flex items-center justify-center bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-4 min-h-[calc(100vh-80px)]">
+    <div className="flex items-center justify-center bg-gradient-to-br from-cyan-50 via-blue-50 to-teal-50 p-8 min-h-screen">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-1 pb-4">
           <div className="flex items-center justify-center mb-6">
@@ -88,7 +88,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             Ingresa tus credenciales profesionales
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pb-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="rut" className="text-gray-700">RUT</Label>
@@ -170,15 +170,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               {loading ? "Verificando..." : "Acceder al Sistema"}
             </Button>
           </form>
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600 text-center mb-3">
-              Credenciales de prueba:
-            </p>
-            <div className="text-xs text-gray-500 space-y-2 bg-gray-50 p-3 rounded-md">
-              <p><span className="text-gray-700">Administrador:</span> RUT: <span className="font-mono bg-white px-1 rounded">11111111-1</span> / contraseña: <span className="font-mono bg-white px-1 rounded">admin123</span></p>
-              <p><span className="text-gray-700">Practicante:</span> RUT: <span className="font-mono bg-white px-1 rounded">22222222-2</span> / contraseña: <span className="font-mono bg-white px-1 rounded">prac123</span></p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

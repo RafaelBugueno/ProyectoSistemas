@@ -24,6 +24,7 @@ export function KinesiologoPage({ user, onLogout }: KinesiologoPageProps) {
   const [loadingData, setLoadingData] = useState(true);
   const [showQR, setShowQR] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showConfirmLogout, setShowConfirmLogout] = useState(false);
 
 const obtenerUbicacion = () => {
   if (navigator.geolocation) {
@@ -61,36 +62,54 @@ const obtenerUbicacion = () => {
 const cargarDatosIniciales = async () => {
   try {
     setLoadingData(true);
+
+    // Cargar consultorios asignados al practicante desde la tabla practicante_consultorio
+    console.log("👤 Usuario:", user);
+    console.log("📋 RUT del usuario:", user.rut);
     
-    // Cargar consultorios
-    const responseConsultorios = await apiRequest("/api/consultorios");
-    if (responseConsultorios.status === "ok" && responseConsultorios.data) {
-      const nombresConsultorios = responseConsultorios.data.map((c: any) => c.nombre);
-      setConsultorios(nombresConsultorios);
+    if (user.rut) {
+      console.log("🏥 Cargando consultorios para RUT:", user.rut);
+      const responseConsultorios = await apiRequest(`/api/practicantes/${encodeURIComponent(user.rut)}/consultorios`);
+      console.log("📊 Respuesta de consultorios:", responseConsultorios);
       
-      // Establecer el consultorio del usuario como predeterminado
-      if (user.consultorio && nombresConsultorios.includes(user.consultorio)) {
-        setConsultorioSeleccionado(user.consultorio);
+      if (responseConsultorios.status === "ok" && responseConsultorios.data) {
+        console.log("✅ Datos de consultorios recibidos:", responseConsultorios.data);
+        
+        // Filtrar solo consultorios activos
+        const consultoriosActivos = responseConsultorios.data
+          .filter((c: any) => c.estado === 'activo')
+          .map((c: any) => c.nombre);
+        
+        console.log("🟢 Consultorios activos:", consultoriosActivos);
+        setConsultorios(consultoriosActivos);
+        
+        // Preseleccionar el primer consultorio si hay al menos uno
+        if (consultoriosActivos.length > 0) {
+          setConsultorioSeleccionado(consultoriosActivos[0]);
+          console.log("✅ Auto-seleccionado:", consultoriosActivos[0]);
+        }
+      } else {
+        console.log("⚠️ No se recibieron datos de consultorios");
+        setConsultorios([]);
+        setConsultorioSeleccionado("");
       }
+    } else {
+      console.log("❌ Usuario no tiene RUT");
+      setConsultorios([]);
+      setConsultorioSeleccionado("");
     }
-    
+
     // Cargar tipos de atención
     const responseTipos = await apiRequest("/api/tipos-atencion");
     if (responseTipos.status === "ok" && responseTipos.data) {
       const nombresTipos = responseTipos.data.map((t: any) => t.nombre);
       setTiposAtencion(nombresTipos);
     }
-    
+
     setLoadingData(false);
   } catch (error) {
     console.error("Error cargando datos iniciales:", error);
-    toast.error("Error al cargar datos. Usando valores por defecto.");
-    
-    // Fallback: usar consultorio del usuario si está disponible
-    if (user.consultorio) {
-      setConsultorios([user.consultorio]);
-      setConsultorioSeleccionado(user.consultorio);
-    }
+    toast.error("Error al cargar datos.");
     setLoadingData(false);
   }
 };
@@ -267,17 +286,17 @@ const handleSincronizarDatos = async () => {
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Sincronizar Datos
               </Button>
-              <Button
+              {/* <Button
                 variant="outline"
                 onClick={() => setShowQR(!showQR)}
                 className="h-10 px-4 border-cyan-300 text-cyan-700 hover:bg-cyan-50"
               >
                 <QrCode className="mr-2 h-4 w-4" />
                 {showQR ? "Ocultar QR" : "Mostrar QR"}
-              </Button>
+              </Button> */}
               <Button
                 variant="outline"
-                onClick={onLogout}
+                onClick={() => setShowConfirmLogout(true)}
                 className="h-10 px-4 border-gray-300 hover:bg-gray-50"
               >
                 <LogOut className="mr-2 h-4 w-4" />
@@ -458,7 +477,7 @@ const handleSincronizarDatos = async () => {
         onClick={() => setShowConfirmDialog(false)}
       />
 
-      {/* Diálogo de confirmación */}
+      {/* Diálogo de confirmación de registro */}
       <div className={showConfirmDialog ? "confirm-dialog show" : "confirm-dialog"}>
         <div className="confirm-title">
           ¿Confirmar registro de sesión?
@@ -481,6 +500,22 @@ const handleSincronizarDatos = async () => {
           >
             Confirmar registro
           </button>
+        </div>
+      </div>
+
+      {/* Diálogo de confirmación de cierre de sesión */}
+      <div 
+        className={showConfirmLogout ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmLogout(false)}
+      />
+      <div className={showConfirmLogout ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Cerrar sesión?</div>
+        <div className="confirm-message">
+          ¿Estás seguro que deseas cerrar tu sesión?
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmLogout(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={onLogout}>Cerrar sesión</button>
         </div>
       </div>
     </div>

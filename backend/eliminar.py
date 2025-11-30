@@ -1,29 +1,41 @@
 from generalSQL import DELETE
 
 def eliminarAtencion(id: int):
-    query = f"""
+    query = """
     DELETE FROM atencion
-    WHERE id = {id};
+    WHERE id = %s;
     """
-    return DELETE(query)
+    params = (id,)
+    return DELETE((query, params))
 
 def eliminarPracticante(nombre: str):
-    query = f"""
+    query = """
     DELETE FROM practicante
-    WHERE nombre = '{nombre}';
+    WHERE nombre = %s;
     """
-    return DELETE(query)
+    params = (nombre,)
+    return DELETE((query, params))
 
 def eliminarConsultorio(nombre: str):
-    query = f"""
+    query = """
     DELETE FROM consultorio
-    WHERE nombre = '{nombre}';
+    WHERE nombre = %s;
     """
-    return DELETE(query)
+    params = (nombre,)
+    return DELETE((query, params))
 
 def eliminarTipoAtencion(nombre: str):
-    query = f"""
+    query = """
     DELETE FROM tipo_atencion
-    WHERE nombre = '{nombre}';
+    WHERE nombre = %s;
     """
-    return DELETE(query)
+    params = (nombre,)
+    return DELETE((query, params))
+
+def eliminarConsultorioDePracticante(rut: str, consultorio: str):
+    query = """
+    DELETE FROM practicante_consultorio
+    WHERE rut_practicante = %s AND consultorio_nombre = %s;
+    """
+    params = (rut, consultorio)
+    return DELETE((query, params))

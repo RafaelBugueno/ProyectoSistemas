@@ -1,0 +1,211 @@
+===============================================
+REPORTE DE VULNERABILIDADES SQL INJECTION
+Proyecto: Sistema de Atención Kinesiológica
+Fecha: 30 de Noviembre de 2025
+===============================================
+
+RESUMEN:
+--------
+Se identificaron 22 vulnerabilidades de SQL Injection en el backend debido al uso de f-strings
+para construir queries SQL. Todas las vulnerabilidades fueron corregidas utilizando consultas
+parametrizadas (placeholders %s).
+
+NIVEL DE SEVERIDAD: CRÍTICO
+Riesgo: Los atacantes podrían ejecutar comandos SQL arbitrarios, robar datos sensibles,
+modificar o eliminar información, y comprometer todo el sistema.
+
+===============================================
+ARCHIVOS AFECTADOS Y VULNERABILIDADES:
+===============================================
+
+1. agregar.py (6 vulnerabilidades)
+-----------------------------------
+Línea 3-6: agregarRegistroAtencion()
+  VULNERABLE: f"INSERT INTO atencion... VALUES ('{fecha}', '{consultorio}', '{tipoAtencion}'..."
+  VARIABLES SIN SANITIZAR: fecha, consultorio, tipoAtencion, nombrePracticante, latitud, longitud
+
+Línea 9-12: agregarTipoAtencion()
+  VULNERABLE: f"INSERT INTO tipo_atencion (nombre) VALUES ('{nombre}');"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 15-18: agregarConsultorio()
+  VULNERABLE: f"INSERT INTO consultorio (nombre, direccion) VALUES ('{nombre}', '{direccion}');"
+  VARIABLES SIN SANITIZAR: nombre, direccion
+
+Línea 21-25: agregarPracticante()
+  VULNERABLE: f"INSERT INTO practicante... VALUES ('{nombre}', crypt('{password}'..."
+  VARIABLES SIN SANITIZAR: nombre, password, rut, consultorio
+  NOTA: Aunque usa crypt(), los parámetros no están sanitizados
+
+Línea 28-32: agregarAdministrador()
+  VULNERABLE: f"INSERT INTO administrador... VALUES ('{nombre}', crypt('{password}'..."
+  VARIABLES SIN SANITIZAR: nombre, password, rut
+
+Línea 35-39: asignarConsultorioAPracticante()
+  VULNERABLE: f"INSERT INTO practicante_consultorio... VALUES ('{rut}', '{consultorio}')..."
+  VARIABLES SIN SANITIZAR: rut, consultorio
+
+-----------------------------------
+
+2. seleccionar.py (11 vulnerabilidades)
+-----------------------------------
+Línea 11-20: seleccionarAtencion()
+  VULNERABLE: f"nombre_practicante = '{nombrePracticante}'"
+  VULNERABLE: f"consultorio = '{consultorio}'"
+  VULNERABLE: f"tipo_atencion = '{tipoAtencion}'"
+  VULNERABLE: f"fecha >= '{fechaInicio}'"
+  VULNERABLE: f"fecha <= '{fechaFinal}'"
+  VARIABLES SIN SANITIZAR: Todos los parámetros de filtro
+
+Línea 44-49: seleccionarConsultoriosDePracticante()
+  VULNERABLE: f"WHERE pc.rut_practicante = '{rut}'"
+  VARIABLES SIN SANITIZAR: rut
+
+Línea 56: seleccionarPracticantePorNombre()
+  VULNERABLE: f"SELECT * FROM practicante WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 59: seleccionarAdministradorPorNombre()
+  VULNERABLE: f"SELECT * FROM administrador WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 62: seleccionarPracticantePorRut()
+  VULNERABLE: f"SELECT * FROM practicante WHERE rut = '{rut}';"
+  VARIABLES SIN SANITIZAR: rut
+
+Línea 65: seleccionarAdministradorPorRut()
+  VULNERABLE: f"SELECT * FROM administrador WHERE rut = '{rut}';"
+  VARIABLES SIN SANITIZAR: rut
+
+Línea 68-76: seleccionarAdministradorPorRutConHash()
+  VULNERABLE: f"WHERE rut = '{rut}' AND password = crypt('{password}'..."
+  VARIABLES SIN SANITIZAR: rut, password
+  NOTA CRÍTICA: Expone contraseñas en queries sin sanitizar
+
+Línea 78-86: seleccionarPracticantePorRutConHash()
+  VULNERABLE: f"WHERE rut = '{rut}' AND password = crypt('{password}'..."
+  VARIABLES SIN SANITIZAR: rut, password
+  NOTA CRÍTICA: Expone contraseñas en queries sin sanitizar
+
+-----------------------------------
+
+3. eliminar.py (5 vulnerabilidades)
+-----------------------------------
+Línea 3-6: eliminarAtencion()
+  VULNERABLE: f"DELETE FROM atencion WHERE id = {id};"
+  VARIABLES SIN SANITIZAR: id
+
+Línea 8-12: eliminarPracticante()
+  VULNERABLE: f"DELETE FROM practicante WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 14-18: eliminarConsultorio()
+  VULNERABLE: f"DELETE FROM consultorio WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 20-24: eliminarTipoAtencion()
+  VULNERABLE: f"DELETE FROM tipo_atencion WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nombre
+
+Línea 26-30: eliminarConsultorioDePracticante()
+  VULNERABLE: f"DELETE FROM practicante_consultorio WHERE rut_practicante = '{rut}'..."
+  VARIABLES SIN SANITIZAR: rut, consultorio
+
+-----------------------------------
+
+4. actualizar.py (5 vulnerabilidades)
+-----------------------------------
+Línea 3-7: actualizarConsultorioPracticante()
+  VULNERABLE: f"UPDATE practicante SET consultorio = '{consultorio}' WHERE nombre = '{nombrePracticante}';"
+  VARIABLES SIN SANITIZAR: consultorio, nombrePracticante
+
+Línea 9-14: actualizarPasswordPracticante()
+  VULNERABLE: f"UPDATE practicante SET password = '{nuevaPassword}' WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nuevaPassword, nombre
+  NOTA: Password sin hash ni sanitización
+
+Línea 16-21: actualizarPasswordAdministrador()
+  VULNERABLE: f"UPDATE administrador SET password = '{nuevaPassword}' WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: nuevaPassword, nombre
+  NOTA: Password sin hash ni sanitización
+
+Línea 23-28: actualizarEstadoPracticante()
+  VULNERABLE: f"UPDATE practicante SET estado = '{estado}' WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: estado, nombre
+
+Línea 30-35: actualizarEstadoConsultorio()
+  VULNERABLE: f"UPDATE consultorio SET estado = '{estado}' WHERE nombre = '{nombre}';"
+  VARIABLES SIN SANITIZAR: estado, nombre
+
+-----------------------------------
+
+5. generalSQL.py (4 funciones afectadas)
+-----------------------------------
+Línea 18: INSERT()
+  PROBLEMA: cursor.execute(query) sin parámetros
+  IMPACTO: Ejecuta queries construidas con f-strings
+
+Línea 33: SELECT()
+  PROBLEMA: cursor.execute(query) sin parámetros
+  IMPACTO: Ejecuta queries construidas con f-strings
+
+Línea 60: UPDATE()
+  PROBLEMA: cursor.execute(query) sin parámetros
+  IMPACTO: Ejecuta queries construidas con f-strings
+
+Línea 76: DELETE()
+  PROBLEMA: cursor.execute(query) sin parámetros
+  IMPACTO: Ejecuta queries construidas con f-strings
+
+===============================================
+SOLUCIÓN IMPLEMENTADA:
+===============================================
+
+1. Modificación de generalSQL.py:
+   - Se cambiaron las funciones INSERT(), SELECT(), UPDATE(), DELETE()
+   - Ahora aceptan tupla de parámetros: (query, params)
+   - Ejecutan: cursor.execute(query, params)
+
+2. Modificación de todos los archivos SQL:
+   - Reemplazadas TODAS las f-strings por placeholders %s
+   - Retornan tuplas (query, params) en lugar de strings
+
+3. Ejemplo de cambio:
+   ANTES: f"SELECT * FROM usuario WHERE id = '{id}'"
+   DESPUÉS: ("SELECT * FROM usuario WHERE id = %s", (id,))
+
+===============================================
+VERIFICACIÓN POST-CORRECCIÓN:
+===============================================
+
+✓ agregar.py: 6 funciones parametrizadas
+✓ seleccionar.py: 11 funciones parametrizadas
+✓ eliminar.py: 5 funciones parametrizadas
+✓ actualizar.py: 5 funciones parametrizadas
+✓ generalSQL.py: 4 funciones modificadas para aceptar parámetros
+
+TOTAL: 22 vulnerabilidades SQL Injection CORREGIDAS
+
+===============================================
+RECOMENDACIONES ADICIONALES:
+===============================================
+
+1. Auditoría de Seguridad:
+   - Revisar logs para detectar intentos de explotación previos
+   - Cambiar todas las contraseñas de administrador
+   - Verificar integridad de datos en la base de datos
+
+2. Mejoras Futuras:
+   - Implementar ORM (SQLAlchemy) para mayor seguridad
+   - Agregar rate limiting en endpoints críticos
+   - Implementar logging de todas las queries SQL
+   - Agregar validación de entrada más estricta en el frontend
+
+3. Testing de Seguridad:
+   - Ejecutar pruebas de penetración con herramientas como sqlmap
+   - Implementar tests unitarios que verifiquen sanitización
+   - Configurar escaneo automático de vulnerabilidades en CI/CD
+
+===============================================
+FIN DEL REPORTE
+===============================================

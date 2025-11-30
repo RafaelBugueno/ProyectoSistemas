@@ -19,9 +19,9 @@ interface AdminPageProps {
 }
 
 interface Consultorio {
-  id: number;
   nombre: string;
   direccion?: string;
+  estado?: string;
 }
 
 interface Practicante {
@@ -41,12 +41,13 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   const [filtroBusqueda, setFiltroBusqueda] = useState<string>("");
 
   const [consultorios, setConsultorios] = useState<Consultorio[]>([]);
-  const [consultorioActivoId, setConsultorioActivoId] = useState<number | null>(null);
   const [nuevoConsultorioNombre, setNuevoConsultorioNombre] = useState<string>("");
   const [nuevoConsultorioDireccion, setNuevoConsultorioDireccion] = useState<string>("");
 
   const [practicantes, setPracticantes] = useState<Practicante[]>([]);
   const [practicanteSeleccionado, setPracticanteSeleccionado] = useState<string>("");
+  const [consultoriosAsignados, setConsultoriosAsignados] = useState<string[]>([]);
+  const [consultorioParaAsignar, setConsultorioParaAsignar] = useState<string>("");
   const [nuevoPracticanteNombre, setNuevoPracticanteNombre] = useState<string>("");
   const [nuevoPracticanteRut, setNuevoPracticanteRut] = useState<string>("");
   const [nuevoPracticantePassword, setNuevoPracticantePassword] = useState<string>("");
@@ -55,8 +56,13 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
   // Estados para diálogos de confirmación
   const [showConfirmCrearPracticante, setShowConfirmCrearPracticante] = useState(false);
   const [showConfirmAgregarConsultorio, setShowConfirmAgregarConsultorio] = useState(false);
+  const [showConfirmEliminarConsultorio, setShowConfirmEliminarConsultorio] = useState(false);
+  const [consultorioAEliminar, setConsultorioAEliminar] = useState<string>("");
   const [showConfirmCambiarEstado, setShowConfirmCambiarEstado] = useState(false);
   const [showConfirmLogout, setShowConfirmLogout] = useState(false);
+  const [showConfirmAsignarConsultorio, setShowConfirmAsignarConsultorio] = useState(false);
+  const [showConfirmQuitarConsultorio, setShowConfirmQuitarConsultorio] = useState(false);
+  const [consultorioParaQuitar, setConsultorioParaQuitar] = useState<string>("");
 
   const cargarRegistros = async () => {
     console.log("🔄 AdminPage: Cargando registros...");
@@ -92,9 +98,9 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
       console.log("🏢 AdminPage: Respuesta de consultorios:", response);
       if (response.status === "ok") {
         const consultoriosBackend = response.data.map((c: any) => ({
-          id: c.id || Math.random(),
           nombre: c.nombre,
           direccion: c.direccion,
+          estado: c.estado || 'activo',
         }));
         console.log("✅ AdminPage: Consultorios cargados desde backend:", consultoriosBackend.length);
         setConsultorios(consultoriosBackend);
@@ -120,7 +126,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     if (consultoriosIniciales.length === 0) {
       consultoriosIniciales = [
         {
-          id: 1,
           nombre: "Consultorio Principal",
         },
       ];
@@ -128,26 +133,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
 
     setConsultorios(consultoriosIniciales);
-
-    const consultorioActivoGuardado = localStorage.getItem("consultorioActivoId");
-    let idActivo: number | null = null;
-
-    if (consultorioActivoGuardado) {
-      const parsed = Number(consultorioActivoGuardado);
-      idActivo = Number.isNaN(parsed) ? null : parsed;
-    }
-
-    if (idActivo === null && consultoriosIniciales[0]) {
-      idActivo = consultoriosIniciales[0].id;
-    }
-
-    if (idActivo !== null) {
-      setConsultorioActivoId(idActivo);
-      localStorage.setItem("consultorioActivoId", String(idActivo));
-    } else {
-      setConsultorioActivoId(null);
-      localStorage.removeItem("consultorioActivoId");
-    }
   };
 
   const cargarPracticantes = async () => {
@@ -166,6 +151,18 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
   };
 
+  const cargarConsultoriosAsignados = async (rut: string) => {
+    try {
+      const response = await apiRequest(`/api/practicantes/${encodeURIComponent(rut)}/consultorios`);
+      if (response.status === "ok") {
+        const lista = (response.data || []).map((c: any) => c.nombre);
+        setConsultoriosAsignados(lista);
+      }
+    } catch (error) {
+      setConsultoriosAsignados([]);
+    }
+  };
+
   useEffect(() => {
     console.log("🚀 AdminPage: Componente montado, iniciando carga de datos...");
     console.log("👤 Usuario actual:", user);
@@ -181,6 +178,24 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     
     inicializar();
   }, []);
+
+  // Memo de practicante actual declarado antes de efectos para evitar uso previo
+  const practicanteActual = useMemo(
+    () => practicantes.find((p) => p.nombre === practicanteSeleccionado) || null,
+    [practicantes, practicanteSeleccionado]
+  );
+
+  // Cargar consultorios asignados cuando cambia el practicante seleccionado
+  useEffect(() => {
+    const rutActual = practicanteActual?.rut;
+    if (practicanteSeleccionado && rutActual) {
+      cargarConsultoriosAsignados(rutActual);
+      setConsultorioParaAsignar("");
+    } else {
+      setConsultoriosAsignados([]);
+      setConsultorioParaAsignar("");
+    }
+  }, [practicanteSeleccionado, practicanteActual]);
 
   const limpiarFiltros = () => {
     setFiltroKinesiologo("todos");
@@ -201,15 +216,6 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     localStorage.setItem("consultorios", JSON.stringify(lista));
   };
 
-  const manejarCambioConsultorioActivo = (id: number | null) => {
-    setConsultorioActivoId(id);
-    if (id === null) {
-      localStorage.removeItem("consultorioActivoId");
-    } else {
-      localStorage.setItem("consultorioActivoId", String(id));
-    }
-  };
-
   const handleAgregarConsultorio = () => {
     const nombre = nuevoConsultorioNombre.trim();
 
@@ -221,53 +227,104 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     setShowConfirmAgregarConsultorio(true);
   };
 
-  const confirmarAgregarConsultorio = () => {
+  const confirmarAgregarConsultorio = async () => {
     setShowConfirmAgregarConsultorio(false);
     
     const nombre = nuevoConsultorioNombre.trim();
     const direccion = nuevoConsultorioDireccion.trim();
 
+    if (!nombre) {
+      toast.error("El nombre del consultorio es requerido");
+      return;
+    }
+
+    try {
+      await apiRequest("/api/consultorios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, direccion }),
+      });
+
     const nuevo: Consultorio = {
-      id: Date.now(),
       nombre,
       ...(direccion ? { direccion } : {}),
-    };
+      estado: 'activo',
+    };      const actualizados = [...consultorios, nuevo];
+      actualizarConsultoriosEnStorage(actualizados);
 
-    const actualizados = [...consultorios, nuevo];
-    actualizarConsultoriosEnStorage(actualizados);
-
-    if (!consultorioActivoId) {
-      manejarCambioConsultorioActivo(nuevo.id);
-    }
-
-    setNuevoConsultorioNombre("");
-    setNuevoConsultorioDireccion("");
-    toast.success("Consultorio agregado exitosamente");
-  };
-
-  const handleEliminarConsultorio = (id: number) => {
-    const actualizados = consultorios.filter((c) => c.id !== id);
-    actualizarConsultoriosEnStorage(actualizados);
-
-    if (consultorioActivoId === id) {
-      manejarCambioConsultorioActivo(actualizados[0]?.id ?? null);
+      setNuevoConsultorioNombre("");
+      setNuevoConsultorioDireccion("");
+      toast.success("Consultorio agregado exitosamente");
+    } catch (error: any) {
+      toast.error(error.message || "Error al agregar consultorio");
     }
   };
 
-  const handleRestablecerConsultorios = () => {
-    const porDefecto: Consultorio[] = [
-      { id: 1, nombre: "Consultorio Principal" },
-    ];
-    actualizarConsultoriosEnStorage(porDefecto);
-    manejarCambioConsultorioActivo(porDefecto[0].id);
-    setNuevoConsultorioNombre("");
-    setNuevoConsultorioDireccion("");
+  const handleToggleEstadoConsultorio = (nombre: string) => {
+    setConsultorioAEliminar(nombre);
+    setShowConfirmEliminarConsultorio(true);
   };
 
-  const consultorioActivo = useMemo(
-    () => consultorios.find((c) => c.id === consultorioActivoId) || null,
-    [consultorios, consultorioActivoId]
-  );
+  const confirmarToggleEstadoConsultorio = async () => {
+    setShowConfirmEliminarConsultorio(false);
+    const consultorio = consultorios.find((c) => c.nombre === consultorioAEliminar);
+    if (!consultorio) return;
+
+    const nuevoEstado = consultorio.estado === 'activo' ? 'inactivo' : 'activo';
+    
+    try {
+      await apiRequest(`/api/consultorios/${encodeURIComponent(consultorioAEliminar)}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      
+      const actualizados = consultorios.map((c) =>
+        c.nombre === consultorioAEliminar ? { ...c, estado: nuevoEstado } : c
+      );
+      actualizarConsultoriosEnStorage(actualizados);
+      toast.success(`Consultorio ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} exitosamente`);
+    } catch (error: any) {
+      toast.error(error.message || "Error al cambiar estado del consultorio");
+    }
+    setConsultorioAEliminar("");
+  };
+
+  // Validación matemática del RUT
+  const validarRut = (rut: string): boolean => {
+    // Formato esperado: 12345678-9 o 12345678-K
+    if (!rut || !rut.includes('-')) return false;
+    
+    const [numero, dvIngresado] = rut.split('-');
+    if (!numero || !dvIngresado) return false;
+    
+    // Validar que el número sea válido
+    if (!/^\d+$/.test(numero)) return false;
+    
+    // Calcular dígito verificador
+    let suma = 0;
+    let multiplicador = 2;
+    
+    // Recorrer de derecha a izquierda
+    for (let i = numero.length - 1; i >= 0; i--) {
+      suma += parseInt(numero[i]) * multiplicador;
+      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+    }
+    
+    const resto = suma % 11;
+    let dvCalculado: string;
+    
+    if (resto === 0) {
+      dvCalculado = '0';
+    } else if (resto === 1) {
+      dvCalculado = 'K';
+    } else {
+      dvCalculado = (11 - resto).toString();
+    }
+    
+    // Comparar con el dígito verificador ingresado
+    return dvIngresado.toUpperCase() === dvCalculado;
+  };
 
   // Funciones de gestión de practicantes
   const handleAgregarPracticante = () => {
@@ -278,6 +335,12 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
 
     if (!nombre || !rut || !password || !consultorio) {
       toast.error("Todos los campos son requeridos");
+      return;
+    }
+
+    // Validar RUT matemáticamente
+    if (!validarRut(rut)) {
+      toast.error("El RUT ingresado no es válido. Verifica el dígito verificador.");
       return;
     }
 
@@ -367,10 +430,48 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
     }
   };
 
-  const practicanteActual = useMemo(
-    () => practicantes.find((p) => p.nombre === practicanteSeleccionado) || null,
-    [practicantes, practicanteSeleccionado]
-  );
+  const handleAsignarConsultorio = () => {
+    if (!practicanteActual) {
+      toast.error("Selecciona un practicante primero");
+      return;
+    }
+    if (!consultorioParaAsignar) {
+      toast.error("Selecciona un consultorio a asignar");
+      return;
+    }
+    setShowConfirmAsignarConsultorio(true);
+  };
+
+  const confirmarAsignarConsultorio = async () => {
+    setShowConfirmAsignarConsultorio(false);
+    if (!practicanteActual || !consultorioParaAsignar) return;
+    try {
+      await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteActual.rut)}/consultorios`, {
+        method: "POST",
+        body: JSON.stringify({ consultorio: consultorioParaAsignar })
+      });
+      toast.success("Consultorio asignado");
+      await cargarConsultoriosAsignados(practicanteActual.rut);
+      setConsultorioParaAsignar("");
+    } catch (error: any) {
+      toast.error(error.message || "Error al asignar consultorio");
+    }
+  };
+
+  const handleQuitarConsultorio = async (nombreConsultorio: string) => {
+    if (!practicanteActual) return;
+    try {
+      await apiRequest(`/api/practicantes/${encodeURIComponent(practicanteActual.rut)}/consultorios/${encodeURIComponent(nombreConsultorio)}`, {
+        method: "DELETE"
+      });
+      toast.success("Consultorio removido");
+      await cargarConsultoriosAsignados(practicanteActual.rut);
+    } catch (error: any) {
+      toast.error(error.message || "Error al remover consultorio");
+    }
+  };
+
+  // moved above
 
   // Obtener listas únicas para filtros
   const kinesiologosUnicos = useMemo(() => {
@@ -618,63 +719,13 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
               <div>
                 <CardTitle className="text-sm text-gray-900">Gestión de consultorios</CardTitle>
                 <CardDescription className="text-gray-600">
-                  Define el consultorio actual y administra las sedes disponibles.
+                  Administra las sedes disponibles.
                 </CardDescription>
               </div>
             </div>
-            {consultorioActivo && (
-              <div className="text-sm text-right space-y-1">
-                <p className="text-gray-500">Consultorio actual</p>
-                <p className="font-medium text-gray-900">
-                  {consultorioActivo.nombre}
-                </p>
-                {consultorioActivo.direccion && (
-                  <p className="text-xs text-gray-500">
-                    {consultorioActivo.direccion}
-                  </p>
-                )}
-              </div>
-            )}
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-              <div className="space-y-2">
-                <Label htmlFor="consultorioActivo" className="text-gray-700">
-                  Consultorio activo
-                </Label>
-                <Select
-                  value={consultorioActivoId ? String(consultorioActivoId) : ""}
-                  onValueChange={(value: string) => {
-                    if (!value) {
-                      manejarCambioConsultorioActivo(null);
-                      return;
-                    }
-                    const id = Number(value);
-                    manejarCambioConsultorioActivo(Number.isNaN(id) ? null : id);
-                  }}
-                >
-                  <SelectTrigger id="consultorioActivo" className="border-gray-300">
-                    <SelectValue placeholder="Selecciona un consultorio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {consultorios.length === 0 && (
-                      <SelectItem value="none" disabled>
-                        No hay consultorios configurados
-                      </SelectItem>
-                    )}
-                    {consultorios.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">
-                  Este consultorio se utilizará al registrar nuevas sesiones en el sistema.
-                </p>
-              </div>
-
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <Label className="text-gray-700">Registrar nuevo consultorio</Label>
                 <div className="grid gap-2 md:grid-cols-2">
                   <Input
@@ -694,18 +745,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   <Button type="button" onClick={handleAgregarConsultorio}>
                     Agregar consultorio
                   </Button>
-                  {consultorios.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleRestablecerConsultorios}
-                      className="border-gray-300"
-                    >
-                      Restablecer consultorios
-                    </Button>
-                  )}
                 </div>
-              </div>
             </div>
 
             {consultorios.length > 0 && (
@@ -717,26 +757,17 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   <div className="flex gap-2 pb-2 min-w-max">
                     {consultorios.map((c) => (
                       <Badge
-                        key={c.id}
-                        variant={consultorioActivoId === c.id ? "default" : "outline"}
-                        className={
-                          consultorioActivoId === c.id
-                            ? "bg-cyan-600 text-white whitespace-nowrap"
-                            : "border-gray-300 text-gray-700 whitespace-nowrap"
-                        }
+                        key={c.nombre}
+                        variant="outline"
+                        className={c.estado === 'inactivo' ? 'border-gray-300 text-gray-400 line-through whitespace-nowrap' : 'border-gray-300 text-gray-700 whitespace-nowrap'}
                       >
                         {c.nombre}
-                        {consultorioActivoId === c.id && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wide">
-                            Activo
-                          </span>
-                        )}
                         <button
                           type="button"
-                          className="ml-2 text-[10px] underline"
-                          onClick={() => handleEliminarConsultorio(c.id)}
+                          className={c.estado === 'activo' ? 'btn-remove-consultorio' : 'btn-activate-consultorio'}
+                          onClick={() => handleToggleEstadoConsultorio(c.nombre)}
                         >
-                          Quitar
+                          {c.estado === 'activo' ? 'Desactivar' : 'Activar'}
                         </button>
                       </Badge>
                     ))}
@@ -830,26 +861,59 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-gray-700">Asignar consultorio</Label>
-                <Select
-                  value={practicanteActual?.consultorio || ""}
-                  onValueChange={(value: string) => handleActualizarConsultorioPracticante(value)}
-                  disabled={!practicanteSeleccionado}
-                >
-                  <SelectTrigger className="border-gray-300">
-                    <SelectValue placeholder="Selecciona un consultorio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {consultorios.map((c) => (
-                      <SelectItem key={c.id} value={c.nombre}>
-                        {c.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500">
-                  Cambia el consultorio asignado al practicante seleccionado.
-                </p>
+                <Label className="text-gray-700">Asignar consultorios (múltiples)</Label>
+                <div className="space-y-2">
+                  <div className="overflow-x-auto">
+                    <div className="flex gap-2 pb-2 min-w-max">
+                    {consultoriosAsignados.length === 0 ? (
+                      <span className="text-sm text-gray-500">Sin consultorios asignados</span>
+                    ) : (
+                      consultoriosAsignados.map((nombre) => (
+                        <Badge key={nombre} className="bg-gray-100 text-gray-700 whitespace-nowrap">
+                          {nombre}
+                          <button
+                            type="button"
+                            className="btn-remove-assignment"
+                            onClick={() => { setConsultorioParaQuitar(nombre); setShowConfirmQuitarConsultorio(true); }}
+                          >
+                            Quitar
+                          </button>
+                        </Badge>
+                      ))
+                    )}
+                    </div>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                    <Select
+                      value={consultorioParaAsignar}
+                      onValueChange={(value: string) => setConsultorioParaAsignar(value)}
+                      disabled={!practicanteSeleccionado}
+                    >
+                      <SelectTrigger className="border-gray-300">
+                        <SelectValue placeholder="Selecciona consultorio a asignar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {consultorios
+                          .filter((c) => !consultoriosAsignados.includes(c.nombre))
+                          .map((c) => (
+                            <SelectItem key={c.nombre} value={c.nombre}>
+                              {c.nombre}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      onClick={handleAsignarConsultorio}
+                      disabled={!consultorioParaAsignar || !practicanteSeleccionado}
+                    >
+                      Asignar consultorio
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Puedes asignar varios consultorios al practicante.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -865,8 +929,50 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                 <Input
                   placeholder="RUT (ej: 12345678-9)"
                   value={nuevoPracticanteRut}
-                  onChange={(e) => setNuevoPracticanteRut(e.target.value)}
+                  onChange={(e) => {
+                    let v = e.target.value.toUpperCase();
+                    v = v.replace(/[\.\s]/g, ''); // quitar puntos y espacios
+                    v = v.replace(/[^0-9K-]/g, ''); // permitir solo dígitos, K y guión
+
+                    // Normalizar múltiples guiones
+                    const parts = v.split('-').filter(p => p !== '');
+                    if (v.includes('-')) {
+                      // reconstruir como NUMERO-DV (tomar primeras partes)
+                      const numero = parts[0] || '';
+                      let dv = parts.slice(1).join('');
+                      dv = dv.replace(/[^0-9K]/g, '');
+                      dv = dv.slice(0,1); // solo un caracter verificador
+                      v = numero + (dv ? '-' + dv : '-');
+                    }
+
+                    // Si el usuario escribe K sin guión aún, auto-insertar guión
+                    if (!v.includes('-')) {
+                      const kPos = v.indexOf('K');
+                      if (kPos !== -1) {
+                        // separar número y K
+                        const numero = v.replace(/K/g,'');
+                        v = numero + '-' + 'K';
+                      }
+                    }
+
+                    // Limitar número a 8 dígitos antes del guión
+                    if (v.includes('-')) {
+                      const [numero, dv] = v.split('-');
+                      v = numero.slice(0,8) + '-' + dv;
+                    } else {
+                      // mientras escribe el cuerpo numérico, limitar a 8
+                      v = v.slice(0,8);
+                    }
+
+                    // Evitar guión inicial
+                    if (v.startsWith('-')) v = v.replace(/^-+/, '');
+
+                    setNuevoPracticanteRut(v);
+                  }}
                   className="border-gray-300"
+                  pattern="^[0-9]{1,8}-[0-9K]$"
+                  title="Formato: 1-8 dígitos, guión y dígito o K (ej: 12345678-K)"
+                  maxLength={11}
                 />
                 <Input
                   type="password"
@@ -884,7 +990,7 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {consultorios.map((c) => (
-                      <SelectItem key={c.id} value={c.nombre}>
+                      <SelectItem key={c.nombre} value={c.nombre}>
                         {c.nombre}
                       </SelectItem>
                     ))}
@@ -1277,6 +1383,28 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
         </div>
       </div>
 
+      {/* Diálogo: Cambiar Estado Consultorio */}
+      <div 
+        className={showConfirmEliminarConsultorio ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmEliminarConsultorio(false)}
+      />
+      <div className={showConfirmEliminarConsultorio ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Cambiar estado del consultorio?</div>
+        <div className="confirm-message">
+          {consultorios.find(c => c.nombre === consultorioAEliminar)?.estado === 'activo' ? (
+            <>Estás a punto de <strong>desactivar</strong> el consultorio <strong>{consultorioAEliminar}</strong>.</>
+          ) : (
+            <>Estás a punto de <strong>activar</strong> el consultorio <strong>{consultorioAEliminar}</strong>.</>
+          )}
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmEliminarConsultorio(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarToggleEstadoConsultorio}>
+            {consultorios.find(c => c.nombre === consultorioAEliminar)?.estado === 'activo' ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>
+      </div>
+
       {/* Diálogo: Cambiar Estado Practicante */}
       <div 
         className={showConfirmCambiarEstado ? "confirm-overlay show" : "confirm-overlay"}
@@ -1318,6 +1446,49 @@ export function AdminPage({ user, onLogout }: AdminPageProps) {
         <div className="confirm-buttons">
           <button className="confirm-btn-cancel" onClick={() => setShowConfirmLogout(false)}>Cancelar</button>
           <button className="confirm-btn-confirm" onClick={onLogout}>Cerrar sesión</button>
+        </div>
+      </div>
+
+      {/* Diálogo: Asignar Consultorio a Practicante */}
+      <div 
+        className={showConfirmAsignarConsultorio ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmAsignarConsultorio(false)}
+      />
+      <div className={showConfirmAsignarConsultorio ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Asignar consultorio al practicante?</div>
+        <div className="confirm-message">
+          Se asignará el consultorio <strong>{consultorioParaAsignar}</strong> al practicante <strong>{practicanteActual?.nombre}</strong> (RUT {practicanteActual?.rut}).
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmAsignarConsultorio(false)}>Cancelar</button>
+          <button className="confirm-btn-confirm" onClick={confirmarAsignarConsultorio}>Asignar</button>
+        </div>
+      </div>
+
+      {/* Diálogo: Quitar Consultorio asignado */}
+      <div 
+        className={showConfirmQuitarConsultorio ? "confirm-overlay show" : "confirm-overlay"}
+        onClick={() => setShowConfirmQuitarConsultorio(false)}
+      />
+      <div className={showConfirmQuitarConsultorio ? "confirm-dialog show" : "confirm-dialog"}>
+        <div className="confirm-title">¿Quitar consultorio del practicante?</div>
+        <div className="confirm-message">
+          Se quitará el consultorio <strong>{consultorioParaQuitar}</strong> del practicante <strong>{practicanteActual?.nombre}</strong> (RUT {practicanteActual?.rut}).
+        </div>
+        <div className="confirm-buttons">
+          <button className="confirm-btn-cancel" onClick={() => setShowConfirmQuitarConsultorio(false)}>Cancelar</button>
+          <button 
+            className="confirm-btn-confirm" 
+            onClick={async () => { 
+              if (consultorioParaQuitar && practicanteActual) {
+                await handleQuitarConsultorio(consultorioParaQuitar);
+              }
+              setShowConfirmQuitarConsultorio(false);
+              setConsultorioParaQuitar("");
+            }}
+          >
+            Quitar
+          </button>
         </div>
       </div>
     </div>

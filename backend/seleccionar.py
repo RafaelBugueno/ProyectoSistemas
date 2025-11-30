@@ -39,6 +39,16 @@ def seleccionarConsultorio():
     query = "SELECT * FROM consultorio ORDER BY nombre;"
     return SELECT(query)
 
+def seleccionarConsultoriosDePracticante(rut: str):
+    query = f"""
+    SELECT c.nombre, c.estado
+    FROM practicante_consultorio pc
+    JOIN consultorio c ON pc.consultorio_nombre = c.nombre
+    WHERE pc.rut_practicante = '{rut}'
+    ORDER BY c.nombre;
+    """
+    return SELECT(query)
+
 def seleccionarPracticantes():
     query = "SELECT nombre, rut, consultorio, estado FROM practicante ORDER BY nombre;"
     return SELECT(query)

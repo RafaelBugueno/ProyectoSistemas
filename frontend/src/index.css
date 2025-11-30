@@ -74,6 +74,45 @@
   border-color: #dc2626 !important;
 }
 
+/* Botón para quitar consultorio asignado */
+.btn-remove-assignment {
+  margin-left: 0.5rem;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: #fee2e2; /* red-100 */
+  color: #b91c1c; /* red-700 */
+}
+.btn-remove-assignment:hover {
+  background-color: #fecaca; /* red-200 */
+}
+
+/* Botón para desactivar consultorio */
+.btn-remove-consultorio {
+  margin-left: 0.5rem;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: #fee2e2; /* red-100 */
+  color: #b91c1c; /* red-700 */
+}
+.btn-remove-consultorio:hover {
+  background-color: #fecaca; /* red-200 */
+}
+
+/* Botón para activar consultorio - verde */
+.btn-activate-consultorio {
+  margin-left: 0.5rem;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: #dcfce7; /* green-100 */
+  color: #15803d; /* green-700 */
+}
+.btn-activate-consultorio:hover {
+  background-color: #bbf7d0; /* green-200 */
+}
+
 @layer theme {
   :root, :host {
     --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
